@@ -72,7 +72,10 @@ component extends="HibachiService" persistent="false" accessors="true" output="f
 		var locations = smartList.getRecords();
 		
 		for(var i=1;i<=arrayLen(locations);i++) {
-			arrayAppend(locationOptions, {name=locations[i].getSimpleRepresentation(), value=locations[i].getLocationID()});
+			var locationOption = {};
+			locationOption['name'] = locations[i].getSimpleRepresentation();
+			locationOption['value'] = locations[i].getLocationID();
+			arrayAppend(locationOptions, locationOption);
 		}
 		
 		return locationOptions;
@@ -140,7 +143,7 @@ component extends="HibachiService" persistent="false" accessors="true" output="f
 			getHibachiDAO().flushORMSession();
 			
 			// If this location has any stocks then we need to update them
-			if( arrayLen(arguments.location.getStocks()) ) {
+			if( arrayLen(arguments.location.getStocks()) && !isNull(arguments.location.getParentLocation()) ) {
 				updateStockLocation( fromLocationID=arguments.location.getParentLocation().getlocationID(), toLocationID=arguments.location.getlocationID());
 			}
 		} 
@@ -149,6 +152,23 @@ component extends="HibachiService" persistent="false" accessors="true" output="f
 	}
 	
 	// ======================  END: Save Overrides ============================
+
+		// ====================== START: Delete Overrides =========================
+	
+	public boolean function deleteLocation(required any location) {
+		
+		//Remove this location from all order defaultstocklocation assignments
+		var orderSmartList=getService("OrderService").getOrderSmartlist();
+		orderSmartList.addFilter('defaultstocklocation.locationID',arguments.location.getLocationID());
+		var defaultStockLocationOrders=orderSmartList.getRecords();
+		for(var i=1; i<=arrayLen(defaultStockLocationOrders); i++) {
+				defaultStockLocationOrders[i].setDefaultStockLocation(javaCast('null',''));
+		}
+		
+		return super.delete(arguments.location);
+	}
+	
+	// ======================  END: Delete Overrides ==========================
 	
 	// ==================== START: Smart List Overrides =======================
 	

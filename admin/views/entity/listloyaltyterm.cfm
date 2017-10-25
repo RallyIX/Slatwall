@@ -46,21 +46,32 @@
 Notes:
 
 --->
+<cfimport prefix="swa" taglib="../../../tags" />
+<cfimport prefix="hb" taglib="../../../org/Hibachi/HibachiTags" />
+
+
 <cfparam name="rc.loyaltyTermSmartList" type="any" />
 
 <cfoutput>
 	
-<cf_HibachiEntityActionBar type="listing" object="#rc.loyaltyTermSmartList#" />
-
-<cfset rc.loyaltyTermSmartList.addOrder("loyaltyTermName|ASC") />
-
-<cf_HibachiListingDisplay smartList="#rc.loyaltyTermSmartList#"
-						   recorddetailaction="admin:entity.detailloyaltyterm"
-						   recordEditAction="admin:entity.editloyaltyterm">
-	<cf_HibachiListingColumn propertyIdentifier="loyaltyTermName" />
-	<cf_HibachiListingColumn propertyIdentifier="loyaltyTermStartDateTime" />
-	<cf_HibachiListingColumn propertyIdentifier="loyalty.loyaltyName" />
-	<cf_HibachiListingColumn propertyIdentifier="term.termName" />
-</cf_HibachiListingDisplay>
+	<cfset rc.loyaltyTermSmartList.addOrder("loyaltyTermName|ASC") />
+	
+	<hb:HibachiEntityActionBar type="listing" object="#rc.loyaltyTermSmartList#" showCreate="false">
+			
+		<!--- Create ---> 
+		<hb:HibachiEntityActionBarButtonGroup>
+			<hb:HibachiActionCaller action="admin:entity.createloyaltyterm" entity="loyaltyterm" class="btn btn-primary" icon="plus icon-white" />
+		</hb:HibachiEntityActionBarButtonGroup>
+	</hb:HibachiEntityActionBar>
+	
+	<hb:HibachiListingDisplay smartList="#rc.loyaltyTermSmartList#"
+							   recorddetailaction="admin:entity.detailloyaltyterm"
+							   recordEditAction="admin:entity.editloyaltyterm">
+		
+		<hb:HibachiListingColumn propertyIdentifier="loyaltyTermName" />
+		<hb:HibachiListingColumn propertyIdentifier="loyaltyTermStartDateTime" />
+		<hb:HibachiListingColumn propertyIdentifier="loyalty.loyaltyName" />
+		<hb:HibachiListingColumn propertyIdentifier="term.termName" />
+	</hb:HibachiListingDisplay>
 
 </cfoutput>

@@ -3,10 +3,28 @@
 	<cffunction name="cfcookie">
 		<cfargument name="name" type="string" required="true" />
 		<cfargument name="value" type="any" required="true" />
-		<cfargument name="expires" type="string" default="session only" />
 		<cfargument name="secure" type="boolean" default="false" />
+		<cfargument name="httpOnly" type="boolean"  default="true" />	
+		<cfargument name="expires" type="string" />
+		<cfargument name="domain" type="string" />
+		<!--- cfcookie cannot accept null arguments so using struct to make this easier to work with--->
+
+		<cfif !structKeyExists(arguments, "domain") and len(getApplicationValue("hibachiConfig").sessionCookieDomain)>
+			<cfset arguments.domain = getApplicationValue("hibachiConfig").sessionCookieDomain />
+		</cfif>
 		
-		<cfcookie name="#arguments.name#" value="#arguments.value#" expires="#arguments.expires#" secure="#arguments.secure#">
+		<cfcookie attributeCollection="#removeNullStructValues(arguments)#" />
+	</cffunction>
+	
+	<cffunction name="removeNullStructValues" returntype="struct" >
+		<cfargument name="oldStruct" type="struct">
+		<cfset var newStruct = {}/>
+		<cfloop collection="#arguments.oldStruct#" item="key">
+			<cfif structKeyExists(arguments.oldStruct,key) && !isNull(arguments.oldStruct[key])>
+				<cfset newStruct[key] = arguments.oldStruct[key]/>
+			</cfif>
+		</cfloop>
+		<cfreturn newStruct/>
 	</cffunction>
 	
 	<cffunction name="cfhtmlhead">
@@ -113,14 +131,21 @@
 	</cffunction>
 	
 	<cffunction name="cfmodule">
-		<cfargument name="name" type="string" required="true" />
+		<cfargument name="name" type="string" />
+		<cfargument name="template" type="string" />
 		<cfargument name="attributeCollection" type="struct" required="true" />
 		
 		<cfset var returnContent = "" /> 
-		<cfsavecontent variable="returnContent">
-			<cfmodule name="#arguments.name#" attributecollection="#arguments.attributeCollection#" />
-		</cfsavecontent>
+		<cfif structKeyExists(arguments, "name")>
+			<cfsavecontent variable="returnContent">
+				<cfmodule name="#arguments.name#" attributecollection="#arguments.attributeCollection#" />
+			</cfsavecontent>
+		<cfelseif structKeyExists(arguments, "template")>
+			<cfsavecontent variable="returnContent">
+				<cfmodule template="#arguments.template#" attributecollection="#arguments.attributeCollection#" />
+			</cfsavecontent>
+		</cfif>
+		
 		<cfreturn returnContent />
 	</cffunction>
-	
 </cfcomponent>

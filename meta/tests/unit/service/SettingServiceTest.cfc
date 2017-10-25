@@ -55,9 +55,19 @@ component extends="Slatwall.meta.tests.unit.SlatwallUnitTestBase" {
 	}
 	
 	// getSettingRecordCount()
-	public void function getSettingRecordCount() {
-		var count = variables.service.getSettingRecordCount(settingName="contentRestrictAccessFlag", settingValue=1);
+	public void function getSettingRecordExistsFlag_returns_boolean() {
+		var count = variables.service.getSettingRecordExistsFlag(settingName="contentRestrictAccessFlag");
 		assert(isBoolean(count));
+	}
+	
+	public void function getSettingPrefixTest(){
+		var settingName = 'emailFromEmailAddress';
+		var settingPrefix = variables.service.getSettingPrefix(settingName);
+		assertEquals('email',settingPrefix);
+		
+		settingName = 'randomNonexistent';
+		settingPrefix = variables.service.getSettingPrefix(settingName);
+		assertEquals('',settingPrefix);
 	}
 }
 

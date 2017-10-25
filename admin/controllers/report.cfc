@@ -52,7 +52,8 @@ component output="false" accessors="true" extends="Slatwall.org.Hibachi.HibachiC
 
 	this.secureMethods='';
 	this.secureMethods=listAppend(this.secureMethods,'default');
-	this.secureMethods=listAppend(this.secureMethods,'export');
+	this.secureMethods=listAppend(this.secureMethods,'exportxls');
+	this.secureMethods=listAppend(this.secureMethods,'exportcsv');
 
 	public void function default(required struct rc) {
 		param name="arguments.rc.reportID" default="";
@@ -86,6 +87,10 @@ component output="false" accessors="true" extends="Slatwall.org.Hibachi.HibachiC
 			param name="arguments.rc.reportDateTime" default="#reportEntity.getReportDateTime()#";
 			param name="arguments.rc.dimensions" type="any" default="#reportEntity.getDimensions()#";
 			param name="arguments.rc.metrics" type="any" default="#reportEntity.getMetrics()#";
+			param name="arguments.rc.orderByType" type="any" default="metric";
+			param name="arguments.rc.reportType" type="any" default="#reportEntity.getReportType()#";
+			param name="arguments.rc.limitResults" type="any" default="#reportEntity.getLimitResults()#";
+			param name="arguments.rc.showReport" type="any" default="#reportEntity.getShowReport()#";
 			
 		} else if (!structKeyExists(arguments.rc, "reportName")) {
 			
@@ -100,16 +105,29 @@ component output="false" accessors="true" extends="Slatwall.org.Hibachi.HibachiC
 		}
 		
 		if(arguments.rc.ajaxRequest && structKeyExists(arguments.rc, "reportName")) {
-			arguments.rc.ajaxResponse["report"] = {};
-			arguments.rc.ajaxResponse["report"]["chartData"] = arguments.rc.report.getChartData();
+			
+			arguments.rc.ajaxResponse["report"] = {};		
+			
+			if(arguments.rc.report.getReportType() NEQ "none"){
+				arguments.rc.ajaxResponse["report"]["chartData"] = arguments.rc.report.getChartData();
+			} else { 
+				arguments.rc.ajaxResponse["report"]["hideChart"] = true; 
+			}
+			
 			arguments.rc.ajaxResponse["report"]["configureBar"] = arguments.rc.report.getReportConfigureBar();
-			arguments.rc.ajaxResponse["report"]["dataTable"] = arguments.rc.report.getReportDataTable();
+			
+			if(arguments.rc.report.getShowReport()){ 
+				arguments.rc.ajaxResponse["report"]["dataTable"] = arguments.rc.report.getReportDataTable();
+			} else { 
+				arguments.rc.ajaxResponse["report"]["hideReport"] = true; 	
+			}
+			
 		} else {
 			arguments.rc.pageTitle = arguments.rc.report.getReportTitle();
 		}
 	}
 	
-	public void function export(required struct rc) {
+	public void function exportxls(required struct rc) {
 		param name="arguments.rc.reportID" default="";
 		
 		var report = getHibachiReportService().getReportCFC( arguments.rc.reportName, arguments.rc );
@@ -120,6 +138,21 @@ component output="false" accessors="true" extends="Slatwall.org.Hibachi.HibachiC
 		}	
 		
 		report.exportSpreadsheet();
+		
+		getFW().redirect(action="admin:report.default", queryString="reportName=#report.getClassName()#");
+	}
+	
+	public void function exportcsv(required struct rc) {
+		param name="arguments.rc.reportID" default="";
+		
+		var report = getHibachiReportService().getReportCFC( arguments.rc.reportName, arguments.rc );
+		
+		var reportEntity = getHibachiReportService().getReport( arguments.rc.reportID );
+		if(!isNull(reportEntity)){
+			report.setReportEntity( reportEntity );
+		}	
+		
+		report.exportCSV();
 		
 		getFW().redirect(action="admin:report.default", queryString="reportName=#report.getClassName()#");
 	}

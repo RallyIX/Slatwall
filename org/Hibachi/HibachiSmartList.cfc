@@ -19,6 +19,8 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 	property name="keywordPhrases" type="array";
 	property name="keywordProperties" type="struct" hint="This struct holds the properties that searches reference and their relative weight";
 	
+	property name="attributeKeywordProperties" type="struct" hint="This struct holds the custom attributes that searches reference and their relative weight";
+	
 	property name="hqlParams" type="struct";
 	property name="pageRecordsStart" type="numeric" hint="This represents the first record to display and it is used in paging.";
 	property name="pageRecordsShow" type="numeric" hint="This is the total number of entities to display";
@@ -49,6 +51,7 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 		setWhereConditions([]);
 		setOrders([]);
 		setKeywordProperties({});
+		setAttributeKeywordProperties({});
 		setKeywords([]);
 		setKeywordPhrases([]);
 		setHQLParams({});
@@ -164,7 +167,7 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 			}
 		}
 	}
-	
+	//name value pair string to struct. Separates url string by & ampersand
 	private struct function convertNVPStringToStruct( required string data ) {
 		var returnStruct = {};
 		var ampArray = listToArray(arguments.data, "&");
@@ -474,14 +477,36 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 		}
 		var aliasedProperty = getAliasedProperty(propertyIdentifier=propertyIdentifier);
 		if(len(aliasedProperty)) {
-			arrayAppend(variables.orders, {property=aliasedProperty, direction=orderDirection});
+			var found = false;
+			for(var existingOrder in variables.orders) {
+				if(existingOrder.property == aliasedProperty) {
+					found = true;
+				}
+			}
+			if(!found) {
+				arrayAppend(variables.orders, {property=aliasedProperty, direction=orderDirection});	
+			}
 		}
 	}
 
-	public void function addKeywordProperty(required string propertyIdentifier, required numeric weight) {
-		var aliasedProperty = getAliasedProperty(propertyIdentifier=propertyIdentifier);
-		if(len(aliasedProperty)) {
-			variables.keywordProperties[aliasedProperty] = arguments.weight;
+	public void function addKeywordProperty(required string propertyIdentifier, required numeric weight) {		
+		var entityName = getBaseEntityName();
+		var propertyIsAttribute = getService("hibachiService").getHasAttributeByEntityNameAndPropertyIdentifier(entityName=entityName, propertyIdentifier=arguments.propertyIdentifier);
+		
+		if(propertyIsAttribute) {
+			
+			var lastEntityName = getService("hibachiService").getLastEntityNameInPropertyIdentifier( getBaseEntityName() , arguments.propertyIdentifier );
+			var entitiyID = getService("hibachiService").getPrimaryIDPropertyNameByEntityName( lastEntityName );
+			
+			var idPropertyIdentifier = replace(arguments.propertyIdentifier, listLast(arguments.propertyIdentifier, '.'), entitiyID);
+			var aliasedProperty = getAliasedProperty(propertyIdentifier=idPropertyIdentifier);
+			
+			variables.attributeKeywordProperties[ aliasedProperty & ":" & listLast(arguments.propertyIdentifier, '.') ] = arguments.weight;
+		} else {
+			var aliasedProperty = getAliasedProperty(propertyIdentifier=propertyIdentifier);
+			if(len(aliasedProperty)) {
+				variables.keywordProperties[aliasedProperty] = arguments.weight;
+			}
 		}
 	}
 	
@@ -501,7 +526,7 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 			if(getSelectDistinctFlag()) {
 					hqlSelect &= "distinct ";
 			}
-			hqlSelect &= "#variables.entities[getBaseEntityName()].entityAlias#.#getService('hibachiService').getPrimaryIDPropertyNameByEntityName(getBaseEntityName())#)";
+			hqlSelect &= "#getBaseEntityPrimaryAliase()#)";
 		} else {
 			if(structCount(variables.selects)) {
 				hqlSelect = "SELECT";
@@ -669,7 +694,7 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 		}
 		
 		// Add Search Filters if keywords exist
-		if( arrayLen(variables.Keywords) && structCount(variables.keywordProperties) ) {
+		if( arrayLen(variables.Keywords) && (structCount(variables.keywordProperties) || structCount(variables.attributeKeywordProperties)) ) {
 			if(len(hqlWhere) == 0) {
 				if(!arguments.suppressWhere) {
 					hqlWhere &= " WHERE";
@@ -686,6 +711,14 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 					
 					hqlWhere &= " LOWER(#keywordProperty#) LIKE :#paramID# OR";
 				}
+				
+				//Loop over all attributes and find any matches
+				for(var attributeProperty in variables.attributeKeywordProperties) {
+					var idProperty = listLast(listFirst(attributeProperty,':'), '.');
+					var fullIDMap = left(idProperty, len(idProperty)-2) & '.' & idProperty;
+					hqlWhere &= " EXISTS(SELECT sav.attributeValue FROM #getDao('HibachiDao').getApplicationKey()#AttributeValue as sav WHERE sav.#fullIDMap# = #listFirst(attributeProperty, ":")# AND sav.attribute.attributeCode = '#listLast(attributeProperty,':')#' AND sav.attributeValue LIKE :#paramID# ) OR";
+				}
+				
 				hqlWhere = left(hqlWhere, len(hqlWhere)-3 );
 				hqlWhere &= " ) AND";
 			}
@@ -711,7 +744,11 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 	}
 	
 	public string function getBaseEntityPrimaryAliase() {
-		return "#variables.entities[ getBaseEntityName() ].entityAlias#.#getService("hibachiService").getPrimaryIDPropertyNameByEntityName(getBaseEntityName())#";
+		var idColumnNames = getService("hibachiService").getEntityORMMetaDataObject( getBaseEntityName() ).getIdentifierColumnNames();
+		if( arrayLen(idColumnNames) > 1) {
+			return getAliasedProperty( getService("hibachiService").getPrimaryIDPropertyNameByEntityName( getBaseEntityName() ) );
+		}
+		return "#variables.entities[ getBaseEntityName() ].entityAlias#.id";
 	}
 	
 	public string function getHQLOrder(boolean supressOrderBy=false) {
@@ -998,8 +1035,8 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 	
 	public void function loadSavedState(required string savedStateID) {
 		var savedStates = [];
-		if(hasSessionValue('smartListSavedState')) {
-			savedStates = getSessionValue('smartListSavedState');	
+		if(getHibachiScope().hasSessionValue('smartListSavedState')) {
+			savedStates = getHibachiScope().getSessionValue('smartListSavedState');	
 		}
 		for(var s=1; s<=arrayLen(savedStates); s++) {
 			if(savedStates[s].savedStateID eq arguments.savedStateID) {
@@ -1012,8 +1049,8 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 	
 	private void function saveState() {
 		// Make sure that the saved states structure and array exists
-		if(!hasSessionValue('smartListSavedState')) {
-			setSessionValue('smartListSavedState', []);
+		if(!getHibachiScope().hasSessionValue('smartListSavedState')) {
+			getHibachiScope().setSessionValue('smartListSavedState', []);
 		}
 		
 		var sessionKey = "";
@@ -1029,7 +1066,7 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 		lock name="#sessionKey#_#getHibachiInstanceApplicationScopeKey()#_smartListSavedStateUpdateLogic" timeout="10" {
 		
 			// Get the saved state struct
-			var states = getSessionValue('smartListSavedState');
+			var states = getHibachiScope().getSessionValue('smartListSavedState');
 			
 			// Setup the state
 			var state = getStateStruct();
@@ -1049,7 +1086,7 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 				arrayDeleteAt(states, s);
 			}
 			
-			setSessionValue('smartListSavedState', states);
+			getHibachiScope().setSessionValue('smartListSavedState', states);
 		}
 	}
 	
@@ -1071,6 +1108,7 @@ component accessors="true" persistent="false" output="false" extends="HibachiObj
 		stateStruct.orders = duplicate(variables.orders);
 		stateStruct.keywords = duplicate(variables.keywords);
 		stateStruct.keywordProperties = duplicate(variables.keywordProperties);
+		stateStruct.attributeKeywordProperties = duplicate(variables.attributeKeywordProperties);
 		stateStruct.pageRecordsShow = duplicate(variables.pageRecordsShow);
 		stateStruct.entityJoinOrder = duplicate(variables.entityJoinOrder);
 		stateStruct.selectDistinctFlag = duplicate(variables.selectDistinctFlag);

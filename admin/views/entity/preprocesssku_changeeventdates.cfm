@@ -46,75 +46,40 @@
 Notes:
 
 --->
+<cfimport prefix="swa" taglib="../../../tags" />
+<cfimport prefix="hb" taglib="../../../org/Hibachi/HibachiTags" />
+
+
 <cfparam name="rc.sku" type="any" />
 <cfparam name="rc.processObject" type="any" />
 <cfparam name="rc.edit" type="boolean" />
 <cfparam name="rc.edittype" default="single" >
 <cfparam name="rc._eventEndDateTime" default="#rc.processObject.dateTimePickerFormat(rc.sku.getEventEndDateTime())#" >
 
-<cf_HibachiEntityProcessForm entity="#rc.sku#" edit="#rc.edit#">
+<hb:HibachiEntityProcessForm entity="#rc.sku#" edit="#rc.edit#">
 	
-	<cf_HibachiEntityActionBar type="preprocess" object="#rc.sku#">
-	</cf_HibachiEntityActionBar>
-	<cf_HibachiPropertyRow>
-		<cf_HibachiPropertyList>
+	<hb:HibachiEntityActionBar type="preprocess" object="#rc.sku#">
+	</hb:HibachiEntityActionBar>
+	<hb:HibachiPropertyRow>
+		<hb:HibachiPropertyList>
 			
 			<cfif rc.sku.hasProductSchedule()>
 				<cfif rc.edittype EQ "all">
 					<!--- If we're here it means we're editing a product schedule as opposed to a sku so we don't want to prompt --->
 					<input type="hidden" id="editScope" name="editScope" value="all" />
 				<cfelse>
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" fieldname="editScope" property="editScope" edit="#rc.edit#" valueOptions="#rc.processObject.getEditScopeOptions()#">
+					<hb:HibachiPropertyDisplay object="#rc.processObject#" fieldname="editScope" property="editScope" edit="#rc.edit#" valueOptions="#rc.processObject.getEditScopeOptions()#">
 				</cfif>
-				
-				<cf_HibachiDisplayToggle selector="select[name='editScope']" loadVisable="#(rc.processObject.getEditScope() NEQ 'all') AND (rc.edittype NEQ 'all')#" showValues="single">
-					asdf
-					<!---<cf_HibachiPropertyDisplay object="#rc.processObject#" property="eventStartDateTime" value="#dateFormat(rc.sku.getEventStartDateTime(),"medium")# #timeFormat(rc.sku.getEventStartDateTime(),"hh:mm tt")#" edit="#rc.edit#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="eventEndDateTime" value="#dateFormat(rc.sku.getEventEndDateTime(),"medium")# #timeFormat(rc.sku.getEventEndDateTime(),"hh:mm tt")#"  edit="#rc.edit#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="startReservationDateTime" value="#dateFormat(rc.sku.getstartReservationDateTime(),"medium")# #timeFormat(rc.sku.getstartReservationDateTime(),"hh:mm tt")#"  edit="#rc.edit#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="endReservationDateTime" value="#dateFormat(rc.sku.getEndReservationDateTime(),"medium")# #timeFormat(rc.sku.getEndReservationDateTime(),"hh:mm tt")#"  edit="#rc.edit#">--->
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="_eventStartDateTime" edit="#rc.edit#" value="#rc.processObject.getEventStartDateTime()#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="_eventEndDateTime" edit="#rc.edit#" value="#rc._eventEndDateTime#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="_startReservationDateTime" edit="#rc.edit#" value="#rc.processObject.getStartReservationDateTime()#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="_endReservationDateTime" edit="#rc.edit#" value="#rc.processObject.getEndReservationDateTime()#">
-				</cf_HibachiDisplayToggle>
-				
-				<!--- If editing all instances then only allow to change time --->
-				<cf_HibachiDisplayToggle selector="select[name='editScope']" loadVisable="#(rc.processObject.getEditScope() EQ 'all') OR (rc.edittype EQ 'all')#" showValues="all">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="eventStartTime" value="#timeFormat(rc.sku.getEventStartDateTime())#" fieldType="time" edit="#rc.edit#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="eventEndTime" value="#timeFormat(rc.sku.getEventEndDateTime())#" fieldType="time" edit="#rc.edit#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="reservationStartTime" value="#timeFormat(rc.sku.getStartReservationDateTime())#" fieldType="time" edit="#rc.edit#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="reservationEndTime" value="#timeFormat(rc.sku.getEndReservationDateTime())#" fieldType="time" edit="#rc.edit#">
-				</cf_HibachiDisplayToggle>
-			
-			<cfelse>
-				<!---<cf_HibachiPropertyDisplay object="#rc.sku#" property="eventStartDateTime" edit="#rc.edit#">
-				<cf_HibachiPropertyDisplay object="#rc.sku#" property="eventEndDateTime" edit="#rc.edit#">
-				<cf_HibachiPropertyDisplay object="#rc.sku#" property="startReservationDateTime" edit="#rc.edit#">
-				<cf_HibachiPropertyDisplay object="#rc.sku#" property="endReservationDateTime" edit="#rc.edit#">--->
-				<cf_HibachiPropertyDisplay object="#rc.processObject#" property="_eventStartDateTime" edit="#rc.edit#" value="#rc.processObject.getEventStartDateTime()#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="_eventEndDateTime" edit="#rc.edit#" value="#rc._eventEndDateTime#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="_startReservationDateTime" edit="#rc.edit#" value="#rc.processObject.getStartReservationDateTime()#">
-					<cf_HibachiPropertyDisplay object="#rc.processObject#" property="_endReservationDateTime" edit="#rc.edit#" value="#rc.processObject.getEndReservationDateTime()#">
-			
 			</cfif>
 			
-			<!---<cfset locationConfigurationSmartList = $.slatwall.getSmartList("LocationConfiguration") />
-			<cfset selectedLocationConfigurationIDs = "" />
-			<cfloop array="#rc.sku.getLocationConfigurations()#" index="lc">
-				<cfset selectedLocationConfigurationIDs = listAppend(selectedLocationConfigurationIDs, lc.getlocationConfigurationID()) />
-			</cfloop>
-			<cf_HibachiListingDisplay smartList="#locationConfigurationSmartList#" 
-									  multiselectFieldName="locationConfigurations"
-									  multiselectPropertyIdentifier="locationConfigurationID" 
-									  multiselectValues="#selectedLocationConfigurationIDs#"
-									  edit="#rc.edit#">
-				<cf_HibachiListingColumn propertyIdentifier="locationPathName" />
-				<cf_HibachiListingColumn propertyIdentifier="locationConfigurationName" />
-			</cf_HibachiListingDisplay>--->
+			<hb:HibachiPropertyDisplay object="#rc.sku#" property="eventStartDateTime" edit="#rc.edit#">
+			<hb:HibachiPropertyDisplay object="#rc.sku#" property="eventEndDateTime" edit="#rc.edit#">
+			<hb:HibachiPropertyDisplay object="#rc.sku#" property="startReservationDateTime" edit="#rc.edit#">
+			<hb:HibachiPropertyDisplay object="#rc.sku#" property="endReservationDateTime" edit="#rc.edit#">
 			
-		</cf_HibachiPropertyList>
-	</cf_HibachiPropertyRow>
+			
+		</hb:HibachiPropertyList>
+	</hb:HibachiPropertyRow>
 	
-</cf_HibachiEntityProcessForm>
+</hb:HibachiEntityProcessForm>
 

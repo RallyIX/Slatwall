@@ -46,15 +46,17 @@
 Notes:
 
 --->
+<cfimport prefix="swa" taglib="../../../tags" />
+<cfimport prefix="hb" taglib="../../../org/Hibachi/HibachiTags" />
 <cfoutput>
 <div class="accountDetails">
 	<form name="account" method="post">
 		<h5>Account Details</h5>
 		<dl>
-			<cf_SlatwallErrorDisplay object="#rc.account#" errorName="cmsError" />
-			<cf_SlatwallPropertyDisplay object="#rc.account#" fieldname="firstName" property="firstName" edit="true">
-			<cf_SlatwallPropertyDisplay object="#rc.account#" fieldname="lastName" property="lastName" edit="true">
-			<cf_SlatwallPropertyDisplay object="#rc.account#" fieldname="company" property="company" edit="true">
+			<swa:SlatwallErrorDisplay object="#rc.account#" errorName="cmsError" />
+			<swa:SlatwallPropertyDisplay object="#rc.account#" fieldname="firstName" property="firstName" edit="true">
+			<swa:SlatwallPropertyDisplay object="#rc.account#" fieldname="lastName" property="lastName" edit="true">
+			<swa:SlatwallPropertyDisplay object="#rc.account#" fieldname="company" property="company" edit="true">
 			<dt class="spdphonenumber">
 				<label for="account.phoneNumber" class="required">#$.slatwall.rbKey('entity.accountPhoneNumber.phoneNumber')#</label>
 			</dt>
@@ -64,25 +66,8 @@ Notes:
 					<cfset phoneValue = rc.account.getPrimaryPhoneNumber().getPhoneNumber() />	
 				</cfif>
 				<input type="text" name="phoneNumber" value="#phoneValue#" />
-				<cf_SlatwallErrorDisplay object="#rc.account#" errorName="primaryPhoneNumber" for="phoneNumber" />
+				<swa:SlatwallErrorDisplay object="#rc.account#" errorName="primaryPhoneNumber" for="phoneNumber" />
 			</dd>
-			<!---<cfset attributeValueIndex = 0 />
-			<cfloop array="#rc.attributeSets#" index="local.attributeSet">
-				<cfloop array="#local.attributeSet.getAttributes()#" index="local.attribute">
-					<cfset attributeValueIndex ++ />
-					<cfif local.attribute.getActiveFlag()>
-						<cfset local.attributeValue = rc.account.getAttributeValue(local.attribute.getAttributeID(), true) />
-						<dt>
-							<label for="attribute.#local.attribute.getAttributeID()#">#local.attribute.getAttributeName()#<cfif local.attribute.getRequiredFlag() EQ 1> *</cfif></label>
-						</dt>
-						<dd>
-							<input type="hidden" name="attributeValues[#attributeValueIndex#].attributeValueID" value="#local.attributeValue.getAttributeValueID()#" />
-							<input type="hidden" name="attributeValues[#attributeValueIndex#].attribute.attributeID" value="#local.attribute.getAttributeID()#" />
-							<cf_SlatwallFormField fieldName="attributeValues[#attributeValueIndex#].attributeValue" fieldType="#replace(local.attribute.getAttributeType().getSystemCode(), 'at', '', 'all')#" value="#local.attributeValue.getAttributeValue()#" valueOptions="#local.attribute.getAttributeOptionsOptions()#" />
-						</dd>
-					</cfif>
-				</cfloop>
-			</cfloop> --->
 		</dl>
 		<input type="hidden" name="slatAction" value="frontend:account.save" />
 		<button type="submit">Save</button>

@@ -70,13 +70,11 @@ component entityname="SlatwallSubscriptionTerm" table="SwSubscriptionTerm" persi
 	
 	// Audit Properties
 	property name="createdDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="createdByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="createdByAccountID";
+	property name="createdByAccountID" hb_populateEnabled="false" ormtype="string";
 	property name="modifiedDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="modifiedByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="modifiedByAccountID";
+	property name="modifiedByAccountID" hb_populateEnabled="false" ormtype="string";
 	
 	// Non-Persistent Properties
-
-
 
 	// ============ START: Non-Persistent Property Methods =================
 	
@@ -91,14 +89,17 @@ component entityname="SlatwallSubscriptionTerm" table="SwSubscriptionTerm" persi
 	public void function removeSku(required any sku) {
 		arguments.sku.removeSubscriptionTerm( this );
 	}
-
-	// =============  END:  Bidirectional Helper Methods ===================
+	
+	// =============  END:  Bidirectional Helper Methods =======================
 
 	// ================== START: Overridden Methods ========================
 	
 	// ==================  END:  Overridden Methods ========================
 	
-	// =================== START: ORM Event Hooks  =========================
+	// =================== START: ORM Event Hooks  ========================
 	
 	// ===================  END:  ORM Event Hooks  =========================
+	
+	
+	
 }

@@ -46,21 +46,24 @@
 Notes:
 
 --->
+<cfimport prefix="swa" taglib="../../../../tags" />
+<cfimport prefix="hb" taglib="../../../../org/Hibachi/HibachiTags" />
+
 <cfparam name="rc.order" type="any" />
 
 <cfoutput>
 	<!---
-	<cf_HibachiListingDisplay smartList="#rc.order.getPromotionCodesSmartList()#"
+	<hb:HibachiListingDisplay smartList="#rc.order.getPromotionCodesSmartList()#"
 							  recordDeleteAction="admin:entity.processOrder"
 							  recordDeleteQueryString="processContent=removePromotionCode&redirectAction=admin:entity.detailOrder&orderID=#rc.order.getOrderID()#">
 			
-		<cf_HibachiListingColumn propertyIdentifier="promotionCode" />
-		<cf_HibachiListingColumn tdclass="primary" propertyIdentifier="promotion.promotionName" />
+		<hb:HibachiListingColumn propertyIdentifier="promotionCode" />
+		<hb:HibachiListingColumn tdclass="primary" propertyIdentifier="promotion.promotionName" />
 		
-	</cf_HibachiListingDisplay>
+	</hb:HibachiListingDisplay>
 	--->
 	<cfif arrayLen(rc.order.getPromotionCodes())>
-		<table class="table table-striped table-bordered table-condensed">
+		<table class="table table-bordered table-hover">
 			<tr>
 				<th>#$.slatwall.rbKey('entity.promotionCode')#</th>
 				<th></th>
@@ -68,11 +71,14 @@ Notes:
 			<cfloop array="#rc.order.getPromotionCodes()#" index="appliedPromotionCode">
 				<tr>
 					<td class="primary">#appliedPromotionCode.getPromotionCode()#</td>
-					<td><cf_HibachiProcessCaller action="admin:entity.processOrder" entity="#rc.order#" processContext="removePromotionCode" queryString="promotionCodeID=#appliedPromotionCode.getPromotionCodeID()#" class="btn btn-mini" iconOnly="true" icon="trash"></td>
+					<td class="admin admin2">
+						<hb:HibachiActionCaller action="admin:entity.detailPromotion" queryString="promotionID=#appliedpromotionCode.getPromotion().getPromotionID()#" class="btn btn-default btn-xs" icon="eye-open" iconOnly="true"  />
+						<hb:HibachiProcessCaller action="admin:entity.processOrder" entity="#rc.order#" processContext="removePromotionCode" queryString="promotionCodeID=#appliedPromotionCode.getPromotionCodeID()#" class="btn btn-default btn-xs" iconOnly="true" icon="trash">
+					</td>
 				</tr>
 			</cfloop>
 		</table>
 	</cfif>
 	
-	<cf_HibachiProcessCaller action="admin:entity.preProcessOrder" entity="#rc.order#" processContext="addPromotionCode" class="btn" icon="plus" modal="true" />
+	<hb:HibachiProcessCaller action="admin:entity.preProcessOrder" entity="#rc.order#" processContext="addPromotionCode" class="btn btn-default" icon="plus" modal="true" />
 </cfoutput>

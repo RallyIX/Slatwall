@@ -7,36 +7,94 @@ component output="false" accessors="true" extends="HibachiTransient" {
 	property name="loggedInAsAdminFlag" type="boolean";
 	property name="publicPopulateFlag" type="boolean";
 	property name="persistSessionFlag" type="boolean";
-	property name="calledActions" type="array";
-	property name="failureActions" type="array";
-	property name="sucessfulActions" type="array";
+	property name="sessionFoundNPSIDCookieFlag" type="boolean";
+	property name="sessionFoundPSIDCookieFlag" type="boolean";
+	
 	property name="ormHasErrors" type="boolean" default="false";
 	property name="rbLocale";
 	property name="url" type="string";
 	
+	property name="calledActions" type="array";
+	property name="failureActions" type="array";
+	property name="successfulActions" type="array";
+	
+	property name="auditsToCommitStruct" type="struct";
+	property name="modifiedEntities" type="array";
+	
 	public any function init() {
-		setCalledActions( [] );
-		setSucessfulActions( [] );
-		setFailureActions( [] );
 		setORMHasErrors( false );
 		setRBLocale( "en_us" );
 		setPublicPopulateFlag( false );
 		setPersistSessionFlag( true );
+		setSessionFoundNPSIDCookieFlag( false );
+		setSessionFoundPSIDCookieFlag( false );
+		
+		setCalledActions( [] );
+		setSuccessfulActions( [] );
+		setFailureActions( [] );
+		
+		setAuditsToCommitStruct( {} );
+		setModifiedEntities( [] );
+		
 		
 		return super.init();
 	}
 	
-	public string function renderJSObject() {
-		var config = {};
-		config[ 'baseURL' ] = getApplicationValue('baseURL');
-		config[ 'action' ] = getApplicationValue('action');
-		config[ 'dateFormat' ] = 'mmm dd, yyyy';
-		config[ 'timeFormat' ] = 'hh:mm tt';
+	// @hint facade method to check the application scope for a value
+	public boolean function hasSessionValue(required any key) {
+		param name="session" default="#structNew()#";
+		if( structKeyExists(session, getHibachiInstanceApplicationScopeKey()) && structKeyExists(session[ getHibachiInstanceApplicationScopeKey() ], arguments.key)) {
+			return true;
+		}
 		
+		return false;
+	}
+	
+	// @hint facade method to get values from the application scope
+	public any function getSessionValue(required any key) {
+		if( structKeyExists(session, getHibachiInstanceApplicationScopeKey()) && structKeyExists(session[ getHibachiInstanceApplicationScopeKey() ], arguments.key)) {
+			return session[ getHibachiInstanceApplicationScopeKey() ][ arguments.key ];
+		}
+		
+		throw("You have requested a value for '#arguments.key#' from the core application that is not setup.  This may be because the verifyApplicationSetup() method has not been called yet")
+	}
+	
+	// @hint facade method to set values in the application scope 
+	public void function setSessionValue(required any key, required any value) {
+		var sessionKey = "";
+		if(structKeyExists(COOKIE, "JSESSIONID")) {
+			sessionKey = COOKIE.JSESSIONID;
+		} else if (structKeyExists(COOKIE, "CFTOKEN")) {
+			sessionKey = COOKIE.CFTOKEN;
+		} else if (structKeyExists(COOKIE, "CFID")) {
+			sessionKey = COOKIE.CFID;
+		}
+		lock name="#sessionKey#_#getHibachiInstanceApplicationScopeKey()#_#arguments.key#" timeout="10" {
+			if(!structKeyExists(session, getHibachiInstanceApplicationScopeKey())) {
+				session[ getHibachiInstanceApplicationScopeKey() ] = {};
+			}
+			session[ getHibachiInstanceApplicationScopeKey() ][ arguments.key ] = arguments.value;
+		}
+	}
+	
+	public string function renderJSObject() {
+		var config = getService('HibachiSessionService').getConfig();
 		var returnHTML = '';
 		returnHTML &= '<script type="text/javascript" src="#getApplicationValue('baseURL')#/org/Hibachi/HibachiAssets/js/hibachi-scope.js"></script>';
 		returnHTML &= '<script type="text/javascript">(function( $ ){$.#lcase(getApplicationValue('applicationKey'))# = new Hibachi(#serializeJSON(config)#);})( jQuery );</script>';
 		return returnHTML;
+	}
+	
+	public void function addModifiedEntity( required any entity ) {
+		arrayAppend(getModifiedEntities(), arguments.entity);
+	}
+	
+	public void function clearModifiedEntities() {
+		setModifiedEntities([]);
+	}
+	
+	public void function clearAuditsToCommitStruct() {
+		setAuditsToCommitStruct({});
 	}
 	
 	public boolean function getLoggedInFlag() {
@@ -66,13 +124,13 @@ component output="false" accessors="true" extends="HibachiTransient" {
 	// ==================== GENERAL API METHODS ===============================
 	
 	// Action Methods ===
-	public string function doAction( required string action ) {
+	public string function doAction( required string action, struct data={} ) {
 		arrayAppend(getCalledActions(), arguments.action);
-		return getApplicationValue('application').doAction( arguments.action );
+		return getApplicationValue('application').doAction( arguments.action, arguments.data );
 	}
 	
 	public boolean function hasSuccessfulAction( required string action ) {
-		return arrayFindNoCase(getSucessfulActions(), arguments.action) > 0;
+		return arrayFindNoCase(getSuccessfulActions(), arguments.action) > 0;
 	}
 	
 	public boolean function hasFailureAction( required string action ) {
@@ -83,7 +141,7 @@ component output="false" accessors="true" extends="HibachiTransient" {
 		if(arguments.failure) {
 			arrayAppend(getFailureActions(), arguments.action);
 		} else {
-			arrayAppend(getSucessfulActions(), arguments.action);
+			arrayAppend(getSuccessfulActions(), arguments.action);
 		}
 	}
 	
@@ -128,7 +186,7 @@ component output="false" accessors="true" extends="HibachiTransient" {
 	
 	public any function getSession() {
 		if(!structKeyExists(variables, "session")) {
-			getService("hibachiSessionService").setPropperSession();
+			getService("hibachiSessionService").setProperSession();
 		}
 		return variables.session;
 	}
@@ -177,14 +235,16 @@ component output="false" accessors="true" extends="HibachiTransient" {
 				message = replace(message, "${itemEntityName}", rbKey("entity.#entityName#") );
 			}
 		}
-		
 		showMessage(message=message, messageType=messageType);
 	}
 	
 	public void function showMessage(string message="", string messageType="info") {
-		param name="request.context.messages" default="#arrayNew(1)#";
-		
-		arrayAppend(request.context.messages, arguments);
+		param name="request.context['messages']" default="#arrayNew(1)#";
+		arguments.message=getService('HibachiUtilityService').replaceStringTemplate(arguments.message,request.context);
+		var messageStruct = {};
+		messageStruct['message'] = arguments.message;
+		messageStruct['messageType'] = arguments.messageType;
+		arrayAppend(request.context['messages'], messageStruct);
 	}
 	
 	// ========================== HELPER DELIGATION METHODS ===============================
@@ -196,6 +256,10 @@ component output="false" accessors="true" extends="HibachiTransient" {
 			keyValue = getService("hibachiUtilityService").replaceStringTemplate(keyValue, arguments.replaceStringData);
 		}
 		return keyValue;
+	}
+	
+	public string function getRBKey(required string key, struct replaceStringData) {
+		return rbKey(argumentcollection=arguments);
 	}
 	
 	public boolean function authenticateAction( required string action ) {
@@ -210,4 +274,11 @@ component output="false" accessors="true" extends="HibachiTransient" {
 		return getService("hibachiAuthenticationService").authenticateEntityPropertyCrudByAccount( crudType=arguments.crudType, entityName=arguments.entityName, propertyName=arguments.propertyName, account=getAccount() );
 	}
 	
+	public boolean function authenticateCollection(required string crudType, required any collection){
+		return getService("hibachiAuthenticationService").authenticateCollectionCrudByAccount( crudType=arguments.crudType, collection=arguments.collection, account=getAccount() );
+	}
+	
+	public boolean function authenticateCollectionPropertyIdentifier(required string crudType, required any collection, required string propertyIdentifier){
+		return getService("hibachiAuthenticationService").authenticateCollectionPropertyIdentifierCrudByAccount( crudType=arguments.crudType, collection=arguments.collection, propertyIdentifier=arguments.propertyIdentifier, account=getAccount() );
+	}
 }

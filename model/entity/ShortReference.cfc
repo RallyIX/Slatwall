@@ -49,7 +49,7 @@ Notes:
 component entityname="SlatwallShortReference" table="SwShortReference" persistent="true" accessors="true" extends="HibachiEntity" hb_serviceName="hibachiService" {
 	
 	// Persistent Properties
-	property name="shortReferenceID" ormtype="integer" fieldtype="id" unsavedvalue="0";
+	property name="shortReferenceID" ormtype="integer" fieldtype="id" unsavedvalue="0" default="0";
 	property name="referenceObjectID" ormtype="string" unique="true" index="EI_REFERENCEOBJECTID";
 	property name="referenceObject" ormtype="string" index="EI_REFERENCEOBJECT";
 
@@ -66,6 +66,10 @@ component entityname="SlatwallShortReference" table="SwShortReference" persisten
 	// Remote Properties
 	
 	// Audit Properties
+	property name="createdDateTime" hb_populateEnabled="false" ormtype="timestamp";
+	property name="createdByAccountID" hb_populateEnabled="false" ormtype="string";
+	property name="modifiedDateTime" hb_populateEnabled="false" ormtype="timestamp";
+	property name="modifiedByAccountID" hb_populateEnabled="false" ormtype="string";
 	
 	// Non-Persistent Properties
 	property name="referenceEntity" persistent="false";
@@ -97,6 +101,12 @@ component entityname="SlatwallShortReference" table="SwShortReference" persisten
 	
 	// ============== START: Overridden Implicit Getters ===================
 	
+	public string function getShortReferenceID() {
+		if(structKeyExists(variables, "shortReferenceID")) {
+			return variables.shortReferenceID;	
+		}
+	}
+	
 	// ==============  END: Overridden Implicit Getters ====================
 	
 	// ============= START: Overridden Smart List Getters ==================
@@ -104,6 +114,10 @@ component entityname="SlatwallShortReference" table="SwShortReference" persisten
 	// =============  END: Overridden Smart List Getters ===================
 
 	// ================== START: Overridden Methods ========================
+	
+	public any function getSimpleRepresentationPropertyName() {
+		return "referenceObject";
+	}
 	
 	// ==================  END:  Overridden Methods ========================
 	

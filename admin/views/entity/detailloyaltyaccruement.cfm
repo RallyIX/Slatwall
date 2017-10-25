@@ -46,15 +46,19 @@
 Notes:
 
 --->
+<cfimport prefix="swa" taglib="../../../tags" />
+<cfimport prefix="hb" taglib="../../../org/Hibachi/HibachiTags" />
+
+
 <cfparam name="rc.loyaltyAccruement" type="any">
 <cfparam name="rc.loyalty" type="any" default="#rc.loyaltyAccruement.getLoyalty()#">
 <cfparam name="rc.edit" type="boolean">
 
 <cfoutput>
-	<cf_HibachiEntityDetailForm object="#rc.loyaltyAccruement#" edit="#rc.edit#"  
+	<hb:HibachiEntityDetailForm object="#rc.loyaltyAccruement#" edit="#rc.edit#"  
 								saveActionQueryString="loyaltyID=#rc.loyalty.getLoyaltyID()#">
 								
-		<cf_HibachiEntityActionBar type="detail" object="#rc.loyaltyAccruement#" edit="#rc.edit#"
+		<hb:HibachiEntityActionBar type="detail" object="#rc.loyaltyAccruement#" edit="#rc.edit#"
 								   backAction="admin:entity.detailloyalty"
 								   backQueryString="loyaltyID=#rc.loyalty.getLoyaltyID()#"
 								   cancelAction="admin:entity.detailloyalty"
@@ -63,25 +67,17 @@ Notes:
 		
 		<input type="hidden" name="loyalty.loyaltyID" value="#rc.loyalty.getLoyaltyID()#" />
 		
-		<cf_HibachiPropertyRow>
-			<cf_HibachiPropertyList>
-				<cf_HibachiPropertyDisplay object="#rc.loyaltyAccruement#" property="activeFlag" edit="#rc.edit#">
-				<cf_HibachiPropertyDisplay object="#rc.loyaltyAccruement#" property="startDateTime" edit="#rc.edit#">
-				<cf_HibachiPropertyDisplay object="#rc.loyaltyAccruement#" property="endDateTime" edit="#rc.edit#">
-				<cf_HibachiPropertyDisplay object="#rc.loyaltyAccruement#" property="expirationTerm" edit="#rc.edit#">
-				<cf_HibachiPropertyDisplay object="#rc.loyaltyAccruement#" property="accruementType" edit="#rc.edit#">
-				<cf_HibachiPropertyDisplay object="#rc.loyaltyAccruement#" property="pointType" edit="#rc.edit#">
-				<cf_HibachiPropertyDisplay object="#rc.loyaltyAccruement#" property="pointQuantity" edit="#rc.edit#">				
-			</cf_HibachiPropertyList>
-		</cf_HibachiPropertyRow>
 		
-		<cfif not listFindNoCase("orderClosed,enrollment", rc.loyaltyAccruement.getAccruementType())>
-			<cf_HibachiTabGroup object="#rc.loyaltyAccruement#">
-				<cf_HibachiTab view="admin:entity/loyaltyAccruementtabs/producttypes" />
-				<cf_HibachiTab view="admin:entity/loyaltyAccruementtabs/products" />
-				<cf_HibachiTab view="admin:entity/loyaltyAccruementtabs/skus" />
-				<cf_HibachiTab view="admin:entity/loyaltyAccruementtabs/brands" />
-			</cf_HibachiTabGroup>
-		</cfif>
-	</cf_HibachiEntityDetailForm>
+		
+			<hb:HibachiEntityDetailGroup object="#rc.loyaltyAccruement#">
+				<hb:HibachiEntityDetailItem view="admin:entity/loyaltyAccruementtabs/basic" open="true" text="#$.slatwall.rbKey('admin.define.basic')#" showOnCreateFlag=true />
+				<cfif not listFindNoCase("orderClosed,enrollment", rc.loyaltyAccruement.getAccruementType())>
+					<hb:HibachiEntityDetailItem view="admin:entity/loyaltyAccruementtabs/producttypes" />
+					<hb:HibachiEntityDetailItem view="admin:entity/loyaltyAccruementtabs/products" />
+					<hb:HibachiEntityDetailItem view="admin:entity/loyaltyAccruementtabs/skus" />
+					<hb:HibachiEntityDetailItem view="admin:entity/loyaltyAccruementtabs/brands" />
+				</cfif>
+			</hb:HibachiEntityDetailGroup>
+		
+	</hb:HibachiEntityDetailForm>
 </cfoutput>

@@ -78,16 +78,17 @@ component displayname="Product Type" entityname="SlatwallProductType" table="SwP
 	property name="priceGroupRates" singularname="priceGroupRate" cfc="PriceGroupRate" fieldtype="many-to-many" linktable="SwPriceGroupRateProductType" fkcolumn="productTypeID" inversejoincolumn="priceGroupRateID" inverse="true";
 	property name="priceGroupRateExclusions" singularname="priceGroupRateExclusion" cfc="PriceGroupRate" fieldtype="many-to-many" linktable="SwPriceGrpRateExclProductType" fkcolumn="productTypeID" inversejoincolumn="priceGroupRateID" inverse="true";
 	property name="attributeSets" singularname="attributeSet" cfc="AttributeSet" type="array" fieldtype="many-to-many" linktable="SwAttributeSetProductType" fkcolumn="productTypeID" inversejoincolumn="attributeSetID" inverse="true";
+	property name="optionGroups" singularname="optionGroup" cfc="OptionGroup" type="array" fieldtype="many-to-many" linktable="SwOptionGroupProductType" fkcolumn="productTypeID" inversejoincolumn="optionGroupID" inverse="true";
 	property name="physicals" singularname="physical" cfc="Physical" type="array" fieldtype="many-to-many" linktable="SwPhysicalProductType" fkcolumn="productTypeID" inversejoincolumn="physicalID" inverse="true";
 	
 	// Remote properties
 	property name="remoteID" ormtype="string";
 	
-	// Audit properties
+	// Audit Properties
 	property name="createdDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="createdByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="createdByAccountID";
+	property name="createdByAccountID" hb_populateEnabled="false" ormtype="string";
 	property name="modifiedDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="modifiedByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="modifiedByAccountID";
+	property name="modifiedByAccountID" hb_populateEnabled="false" ormtype="string";
 	
 	// Non-Persistent Properties
 	property name="parentProductTypeOptions" type="array" persistent="false";
@@ -110,7 +111,7 @@ component displayname="Product Type" entityname="SlatwallProductType" table="SwP
 		}
 	}
 	
-	//get merchandisetype 
+	//get merchandise type 
 	public any function getBaseProductType() {
 		if(isNull(getSystemCode()) || getSystemCode() == ""){
 			return getService("ProductService").getProductType(listFirst(getProductTypeIDPath())).getSystemCode();
@@ -231,6 +232,14 @@ component displayname="Product Type" entityname="SlatwallProductType" table="SwP
 		arguments.attributeSet.removeProductType( this );
 	}
 	
+	// Attribute Sets (many-to-many - inverse)
+	public void function addOptionGroup(required any optionGroup) {
+		arguments.optionGroup.addProductType( this );
+	}
+	public void function removeOptionGroup(required any attributeSet) {
+		arguments.optionGroup.removeProductType( this );
+	}
+	
 	// Attribute Values (one-to-many)
 	public void function addAttributeValue(required any attributeValue) {
 		arguments.attributeValue.setProductType( this );
@@ -308,7 +317,7 @@ component displayname="Product Type" entityname="SlatwallProductType" table="SwP
 	
 	public string function getSimpleRepresentation() {
 		if(!isNull(getParentProductType())) {
-			return getParentProductType().getSimpleRepresentation() & " &raquo; " & getProductTypeName();
+			return getParentProductType().getSimpleRepresentation() & " | " & getProductTypeName();
 		}
 		return getProductTypeName();
 	}
@@ -319,8 +328,8 @@ component displayname="Product Type" entityname="SlatwallProductType" table="SwP
 			variables.assignedAttributeSetSmartList = getService("attributeService").getAttributeSetSmartList();
 			
 			variables.assignedAttributeSetSmartList.addFilter('activeFlag', 1);
-			variables.assignedAttributeSetSmartList.addFilter('attributeSetType.systemCode', 'astProductType');
-			
+			variables.assignedAttributeSetSmartList.addFilter('attributeSetObject', 'ProductType');
+			variables.assignedAttributeSetSmartList.setSelectDistinctFlag(true);
 			variables.assignedAttributeSetSmartList.joinRelatedProperty("SlatwallAttributeSet", "productTypes", "left");
 			
 			var wc = "(";

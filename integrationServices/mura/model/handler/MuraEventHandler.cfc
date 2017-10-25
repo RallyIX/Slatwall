@@ -369,26 +369,17 @@
 				$.slatwall.setContent( barrierPage );
 				
 				// Update the mura content to use the barrier page or 404
-				if(!isNull(barrierPage.getCMSContentID()) && len(barrierPage.getCMSContentID())) {
-					$.event('contentBean', $.getBean("content").loadBy( contentID=barrierPage.getCMSContentID() ) );
-				} else {
-					$.event('contentBean', $.getBean("content") );
+				if( $.content().getIsOnDisplay() ) {
+
+					if(!isNull(barrierPage.getCMSContentID()) && len(barrierPage.getCMSContentID())) {
+						$.event('contentBean', $.getBean("content").loadBy( contentID=barrierPage.getCMSContentID() ) );
+					} else {
+						$.event('contentBean', $.getBean("content") );
+					}
+
 				}
 			}
-		}
-		
-		public void function onRenderEnd( required any $ ) {
-			if($.slatwall.getLoggedInAsAdminFlag()) {
-				// Set up frontend tools
-				var fetools = "";
-				/*
-				savecontent variable="fetools" {
-					include "/Slatwall/assets/fetools/fetools.cfm";
-				};
-				*/
-				
-				$.event('__muraresponse__', replace($.event('__muraresponse__'), '</body>', '#fetools#</body>'));
-			}
+			$.slatwall.getService("hibachiEventService").announceEvent(eventName="MuraOnRenderStartComplete");
 		}
 		
 		public void function onSiteRequestEnd( required any $ ) {
@@ -480,6 +471,47 @@
 			var slatwallSite = $.slatwall.getService("siteService").getSiteByCMSSiteID($.event('siteID'));
 			syncMuraCategories($=$, slatwallSiteID=slatwallSite.getSiteID(), muraSiteID=$.event('siteID'));
 			
+			if( StructKeyExists(form, 'categoryID')){
+				
+				var muraCategory = $.event('categoryBean');
+				
+				if (!muraCategory.getIsNew()){
+					var slatwallCategory = $.slatwall.getService("ContentService").getCategoryByCMSCategoryIDAndCMSSiteID( muraCategory.getCategoryID(), muraCategory.getSiteID() );
+					var oldCategoryIDPath = slatwallCategory.getCategoryIDPath();
+					
+					//Set the category to the updated name
+					slatwallCategory.setCategoryName( muraCategory.getName() );
+					
+					if(!muraCategory.getParent().getIsNew()) {
+						var parentCategory = $.slatwall.getService("ContentService").getCategoryByCMSCategoryIDAndCMSSiteID( muraCategory.getParent().getcategoryID(), muraCategory.getSiteID() );
+						
+						//If the slatwallCategory's Parent and the parentCategory variable don't match then the parent has been updated. 
+						if( isNull(slatwallCategory.getParentCategory()) || slatwallCategory.getParentCategory().getCategoryID() != parentCategory.getCategoryID() ) {
+							slatwallCategory.setParentCategory(parentcategory);
+							
+							//Build the ID LIst
+							var newIDList = parentCategory.getCategoryIDPath();
+							listAppend(newIDList, slatwallCategory.getCategoryID() );
+							
+							//Set the new categoryIDPath
+							slatwallCategory.setCategoryIDPath(newIDList);
+							
+							// Update all nested categories
+							updateOldSlatwallCategoryIDPath(oldCategoryIDPath=oldCategoryIDPath, newCategoryIDPath=newIDList);
+						}
+					}else if ( muraCategory.getParent().getIsNew() && !isNull(slatwallCategory.getParentCategory()) )  {
+						//Set parent to null
+						slatwallCategory.setParentCategory( javaCast('null', '') );
+						
+						//Update the ID path
+						slatwallCategory.setCategoryIDPath( slatwallCategory.getCategoryID() );
+						
+						// Update all nested categories
+						updateOldSlatwallCategoryIDPath(oldCategoryIDPath=oldCategoryIDPath, newCategoryIDPath=slatwallCategory.getCategoryID());
+					}
+				}
+			}
+			
 			syncMuraContentCategoryAssignment( muraSiteID=$.event('siteID') );
 			
 			endSlatwallRequest();
@@ -554,7 +586,7 @@
 				
 				// Populate Template Type if it Exists
 				if(structKeyExists(contentData, "contentTemplateType") && structKeyExists(contentData.contentTemplateType, "typeID") && len(contentData.contentTemplateType.typeID)) {
-					var type = $.slatwall.getService("settingService").getType( contentData.contentTemplateType.typeID );
+					var type = $.slatwall.getService("typeService").getType( contentData.contentTemplateType.typeID );
 					slatwallContent.setContentTemplateType( type );
 				} else {
 					slatwallContent.setContentTemplateType( javaCast("null","") );
@@ -583,7 +615,7 @@
 			}
 			
 			// Sync all content category assignments
-			syncMuraContentCategoryAssignment( muraSiteID=$.event('siteID') );
+			syncMuraContentCategoryAssignment( muraSiteID=$.event('siteID'), muraContentID=$.event('contentBean').getContentID() );
 			
 			endSlatwallRequest();
 		}
@@ -630,11 +662,11 @@
 				// Otherwise just remove the cmsAccountID & account authentication
 				} else {
 					
-					slatwallAccount.setCMSAccountID( javaCase("null", "") );
+					slatwallAccount.setCMSAccountID( javaCast("null", "") );
 					
-					for(var i=arrayLen(account.getAccountAuthentications()); i>=1; i--) {
-						if(!isNull(account.getAccountAuthentications()[i].getIntegration()) && account.getAccountAuthentications()[i].getIntegration().getIntegrationPackage() eq "mura") {
-							$.slatwall.getService("accountService").deleteAccountAuthentication(account.getAccountAuthentications()[i]);
+					for(var i=arrayLen(slatwallAccount.getAccountAuthentications()); i>=1; i--) {
+						if(!isNull(slatwallAccount.getAccountAuthentications()[i].getIntegration()) && slatwallAccount.getAccountAuthentications()[i].getIntegration().getIntegrationPackage() eq "mura") {
+							$.slatwall.getService("accountService").deleteAccountAuthentication(slatwallAccount.getAccountAuthentications()[i]);
 						}
 					}
 				}
@@ -687,15 +719,12 @@
 			var populatedSiteIDs = getMuraPluginConfig().getCustomSetting("populatedSiteIDs");
 			
 			var integration = $.slatwall.getService("integrationService").getIntegrationByIntegrationPackage("mura");
-			if(!integration.getFW1ActiveFlag()) {
-				integration.setFW1ActiveFlag(1);
+			if(isNull(integration.getActiveFlag()) || !integration.getActiveFlag()) {
+				integration.setActiveFlag(1);
 				var ehArr = integration.getIntegrationCFC().getEventHandlers();
 				for(var e=1; e<=arrayLen(ehArr); e++) {
 					$.slatwall.getService("hibachiEventService").registerEventHandler(ehArr[e]);
 				}
-			}
-			if(isNull(integration.getAuthenticationActiveFlag()) || !integration.getAuthenticationActiveFlag()) {
-				integration.setAuthenticationActiveFlag(1);
 			}
 			
 			// Flush the ORM Session
@@ -720,8 +749,8 @@
 					
 					var assetSetting = $.slatwall.getService("settingService").getSettingBySettingName("globalAssetsImageFolderPath", true);
 					if(assetSetting.isNew()) {
-						assetSetting.setSettingValue( replace(expandPath('/muraWRM'), '\', '/', 'all') & '/default/assets/Image/Slatwall' );
 						assetSetting.setSettingName('globalAssetsImageFolderPath');
+						assetSetting.setSettingValue( replace(expandPath('/muraWRM'), '\', '/', 'all') & '/default/assets/Image/Slatwall' );
 						$.slatwall.getService("settingService").saveSetting( assetSetting );
 					}
 				}
@@ -734,6 +763,9 @@
 				// If this is a new site, then we can set the site name
 				if(slatwallSiteWasNew) {
 					slatwallSite.setSiteName( cmsSiteName );
+					slatwallSite.setSiteCode( 
+						$.slatwall.getService('hibachiUtilityService').createUniqueColumn(titleString='mura-#cmsSiteID#', tableName="SwSite",columnName="siteCode")	 
+					);
 					$.slatwall.getService("siteService").saveSite( slatwallSite );
 					slatwallSite.setCMSSiteID( cmsSiteID );
 					$.slatwall.getDAO("hibachiDAO").flushORMSession();
@@ -765,7 +797,7 @@
 					verifySlatwallRequest( $=$ );
 					
 					// Sync all missing content for the siteID
-					syncMuraContent( $=$, slatwallSiteID=threadData.slatwallSiteID, muraSiteID=threadData.cmsSiteID );
+					syncMuraContent( $=$, slatwallSiteID=threadData.slatwallSiteID, muraSiteID=threadData.cmsSiteID, lastUpdateOnlyFlag=false );
 					
 					// Sync all missing categories
 					syncMuraCategories( $=$, slatwallSiteID=threadData.slatwallSiteID, muraSiteID=threadData.cmsSiteID );
@@ -782,19 +814,24 @@
 				if(getMuraPluginConfig().getSetting("createDefaultPages") && !listFindNoCase(populatedSiteIDs, cmsSiteID)) {
 					
 					// Copy views over to the template directory
-					var slatwallTemplatePath = getDirectoryFromPath(expandPath("/Slatwall/public/views/templates")); 
-					var muraTemplatePath = getDirectoryFromPath(expandPath("/muraWRM/#cmsSiteID#/includes/themes/#cmsThemeName#/templates"));
-					$.slatwall.getService("hibachiUtilityService").duplicateDirectory(source=slatwallTemplatePath, destination=muraTemplatePath, overwrite=false, recurse=true, copyContentExclusionList=".svn,.git");
+					var slatwallTemplatePath = getDirectoryFromPath(expandPath("/Slatwall") & "/public/views/templates"); 
+					var muraTemplatesPath = getDirectoryFromPath(expandPath("/muraWRM") & "/#cmsSiteID#/includes/themes/#cmsThemeName#/");
+					$.slatwall.getService("hibachiUtilityService").duplicateDirectory(source=slatwallTemplatePath, destination=muraTemplatesPath, overwrite=false, recurse=true, copyContentExclusionList=".svn,.git");
+					
+					muraTemplatesPath = getDirectoryFromPath(expandPath("/muraWRM") & "/#cmsSiteID#/includes/themes/#cmsThemeName#/templates/");
+					// Update templates to be mura specific
+					updateExampleTemlatesToBeMuraSpecific(muraTemplatesPath=muraTemplatesPath);
 					
 					// Create the necessary pages
-					var templatePortalCMSID = createMuraPage( 		$=$, muraSiteID=cmsSiteID, pageName="Slatwall Templates", 		filename="slatwall-templates", 							template="", 							isNav="0", type="Folder", 	parentID="00000000000000000000000000000000001" );
-					var brandTemplateCMSID = createMuraPage( 		$=$, muraSiteID=cmsSiteID, pageName="Brand Template", 			filename="slatwall-templates/brand-template", 			template="slatwall-brand.cfm", 			isNav="0", type="Page", 	parentID=templatePortalCMSID );
-					var productTypeTemplateCMSID = createMuraPage( 	$=$, muraSiteID=cmsSiteID, pageName="Product Type Template", 	filename="slatwall-templates/product-type-template", 	template="slatwall-producttype.cfm", 	isNav="0", type="Page", 	parentID=templatePortalCMSID );
-					var productTemplateCMSID = createMuraPage( 		$=$, muraSiteID=cmsSiteID, pageName="Product Template", 		filename="slatwall-templates/product-template", 		template="slatwall-product.cfm", 		isNav="0", type="Page", 	parentID=templatePortalCMSID );
-					var accountCMSID = createMuraPage( 				$=$, muraSiteID=cmsSiteID, pageName="My Account", 				filename="my-account", 									template="slatwall-account.cfm", 		isNav="1", type="Page", 	parentID="00000000000000000000000000000000001" );
-					var checkoutCMSID = createMuraPage( 			$=$, muraSiteID=cmsSiteID, pageName="Checkout", 				filename="checkout", 									template="slatwall-checkout.cfm", 		isNav="1", type="Page", 	parentID="00000000000000000000000000000000001" );
-					var shoppingCartCMSID = createMuraPage( 		$=$, muraSiteID=cmsSiteID, pageName="Shopping Cart", 			filename="shopping-cart", 								template="slatwall-shoppingcart.cfm", 	isNav="1", type="Page", 	parentID="00000000000000000000000000000000001" );
-					var productListingCMSID = createMuraPage(		$=$, muraSiteID=cmsSiteID, pageName="Product Listing", 			filename="product-listing", 							template="slatwall-productlisting.cfm", isNav="1", type="Page", 	parentID="00000000000000000000000000000000001" );
+					var templatePortalCMSID = createMuraPage( 		$=$, muraSiteID=cmsSiteID, pageName="Slatwall Templates", 			filename="slatwall-templates", 							template="", 							isNav="0", type="Folder", 	parentID="00000000000000000000000000000000001" );
+					var barrierPageTemplateCMSID = createMuraPage( 	$=$, muraSiteID=cmsSiteID, pageName="Barrier Page Template", 		filename="slatwall-templates/barrier-page-template", 	template="slatwall-barrier-page.cfm", 	isNav="0", type="Page", 	parentID=templatePortalCMSID );
+					var brandTemplateCMSID = createMuraPage( 		$=$, muraSiteID=cmsSiteID, pageName="Brand Template", 				filename="slatwall-templates/brand-template", 			template="slatwall-brand.cfm", 			isNav="0", type="Page", 	parentID=templatePortalCMSID );
+					var productTypeTemplateCMSID = createMuraPage( 	$=$, muraSiteID=cmsSiteID, pageName="Product Type Template", 		filename="slatwall-templates/product-type-template", 	template="slatwall-producttype.cfm", 	isNav="0", type="Page", 	parentID=templatePortalCMSID );
+					var productTemplateCMSID = createMuraPage( 		$=$, muraSiteID=cmsSiteID, pageName="Product Template", 			filename="slatwall-templates/product-template", 		template="slatwall-product.cfm", 		isNav="0", type="Page", 	parentID=templatePortalCMSID );
+					var accountCMSID = createMuraPage( 				$=$, muraSiteID=cmsSiteID, pageName="My Account", 					filename="my-account", 									template="slatwall-account.cfm", 		isNav="1", type="Page", 	parentID="00000000000000000000000000000000001" );
+					var checkoutCMSID = createMuraPage( 			$=$, muraSiteID=cmsSiteID, pageName="Checkout", 					filename="checkout", 									template="slatwall-checkout.cfm", 		isNav="1", type="Page", 	parentID="00000000000000000000000000000000001" );
+					var shoppingCartCMSID = createMuraPage( 		$=$, muraSiteID=cmsSiteID, pageName="Shopping Cart", 				filename="shopping-cart", 								template="slatwall-shoppingcart.cfm", 	isNav="1", type="Page", 	parentID="00000000000000000000000000000000001" );
+					var productListingCMSID = createMuraPage(		$=$, muraSiteID=cmsSiteID, pageName="Product Listing", 				filename="product-listing", 							template="slatwall-productlisting.cfm", isNav="1", type="Page", 	parentID="00000000000000000000000000000000001" );
 					
 					// Sync all missing content for the siteID
 					syncMuraContent( $=$, slatwallSiteID=slatwallSite.getSiteID(), muraSiteID=cmsSiteID );
@@ -804,13 +841,16 @@
 					productListing.setProductListingPageFlag( true );
 					
 					var productTemplate = $.slatwall.getService("contentService").getContentByCMSContentIDAndCMSSiteID( productTemplateCMSID, cmsSiteID );
-					productTemplate.setContentTemplateType( $.slatwall.getService("settingService").getTypeBySystemCode("cttProduct") );
+					productTemplate.setContentTemplateType( $.slatwall.getService("typeService").getTypeBySystemCode("cttProduct") );
 					
 					var productTypeTemplate = $.slatwall.getService("contentService").getContentByCMSContentIDAndCMSSiteID( productTypeTemplateCMSID, cmsSiteID );
-					productTypeTemplate.setContentTemplateType( $.slatwall.getService("settingService").getTypeBySystemCode("cttProductType") );
+					productTypeTemplate.setContentTemplateType( $.slatwall.getService("typeService").getTypeBySystemCode("cttProductType") );
 					
 					var brandTemplate = $.slatwall.getService("contentService").getContentByCMSContentIDAndCMSSiteID( brandTemplateCMSID, cmsSiteID );
-					brandTemplate.setContentTemplateType( $.slatwall.getService("settingService").getTypeBySystemCode("cttBrand") );
+					brandTemplate.setContentTemplateType( $.slatwall.getService("typeService").getTypeBySystemCode("cttBrand") );
+					
+					var barrierPageTemplate = $.slatwall.getService('contentService').getContentByCMSContentIDAndCMSSiteID( barrierPageTemplateCMSID, cmsSiteID );
+					barrierPageTemplate.setContentTemplateType( $.slatwall.getService("typeService").getTypeBySystemCode("cttBarrierPage"));
 					
 					// If the site was new, then we can added default template settings for the site
 					if(slatwallSiteWasNew) {
@@ -831,6 +871,12 @@
 						brandTemplateSetting.setSettingValue( brandTemplate.getContentID() );
 						brandTemplateSetting.setSite( slatwallSite );
 						$.slatwall.getService("settingService").saveSetting( brandTemplateSetting );
+						
+						var barrierPageTemplateSetting = $.slatwall.getService("settingService").newSetting();
+						barrierPageTemplateSetting.setSettingName( 'contentRestrictedContentDisplayTemplate' );
+						barrierPageTemplateSetting.setSettingValue( barrierPageTemplate.getContentID() );
+						barrierPageTemplateSetting.setSite( slatwallSite );
+						$.slatwall.getService("settingService").saveSetting( barrierPageTemplateSetting );
 					}
 					
 					// Flush these changes to the content
@@ -840,6 +886,40 @@
 					getMuraPluginConfig().setCustomSetting("populatedSiteIDs", listAppend(populatedSiteIDs, cmsSiteID));
 				}
 				
+			}
+		}
+		
+		public void function updateExampleTemlatesToBeMuraSpecific( required string muraTemplatesPath ) {
+			
+			// Loop over the files in the mura templates directory
+			var dirList = directoryList( muraTemplatesPath );
+			
+			// These are the changes to the sample app that allow for it to work properly on Mura
+			var replaceStrings = [
+				[
+					'taglib="../../tags"',
+					'taglib="/Slatwall/public/tags"'
+				],[
+					'product.cfm?productID=##product.getProductID()##',
+					'##product.getListingProductURL()##'
+				],[
+					'action="?productID=##$.slatwall.product().getProductID()##&s=1"',
+					'action="?s=1"'
+				],[
+					'href="checkout.cfm"',
+					'href="##$.createHREF(filename=''checkout'')##"'
+				]
+			];
+			
+			for(var filePath in dirList) {
+				var fileName = listLast(filePath, "/\");
+				if(listFindNoCase("_slatwall,slatwall-", left(fileName, 9))) {
+					var content = fileRead(filePath);
+					for(var rArr in replaceStrings) {
+						content = replace(content, rArr[1], rArr[2], 'all');
+					}
+					fileWrite(filePath, content);
+				}
 			}
 		}
 		
@@ -882,8 +962,15 @@
 		<cfargument name="$" />
 		<cfargument name="slatwallSiteID" type="any" required="true" />
 		<cfargument name="muraSiteID" type="string" required="true" />
+		<cfargument name="lastUpdateOnlyFlag" type="boolean" default="true" />
 		
 		<cflock name="slatwallSyncMuraContent_#arguments.muraSiteID#" timeout="60" throwontimeout="true">
+			
+			<cfset var lastUpdate = "" />
+			<cfif arguments.$.slatwall.getService('hibachiCacheService').hasCachedValue('integrationMura_contentSyncLastUpdate')>
+				<cfset lastUpdate = arguments.$.slatwall.getService('hibachiCacheService').getCachedValue('integrationMura_contentSyncLastUpdate') />
+			</cfif>
+			<cfset arguments.$.slatwall.getService('hibachiCacheService').setCachedValue('integrationMura_contentSyncLastUpdate', now()) />
 			
 			<cfset var parentMappingCache = {} />
 			<cfset var missingContentQuery = "" />
@@ -903,6 +990,10 @@
 				  LEFT JOIN
 				  	SwContent on tcontent.contentID = SwContent.cmsContentID AND SwContent.siteID = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.slatwallSiteID#" />
 				WHERE
+				<cfif len(lastUpdate) and arguments.lastUpdateOnlyFlag>
+					tcontent.lastupdate > <cfqueryparam cfsqltype="cf_sql_timestamp" value="#lastUpdate#" />
+				  AND
+				</cfif>
 					tcontent.active = <cfqueryparam cfsqltype="cf_sql_bit" value="1" />
 				  AND
 				  	tcontent.siteID = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.muraSiteID#" />
@@ -996,6 +1087,39 @@
 		</cflock>
 	</cffunction>
 	
+	<cffunction name="updateOldSlatwallCategoryIDPath">
+		<cfargument name="oldCategoryIDPath" type="string" default="" />
+		<cfargument name="newCategoryIDPath" type="string" default="" />
+		
+		<cfset var rs = "" />
+		<cfset var rs2 = "" />
+		<!--- Select any content that is a desendent of the old contentIDPath, and update them to the new path --->
+		<cfquery name="rs">
+			SELECT
+				categoryID,
+				categoryIDPath
+			FROM
+				SwCategory
+			WHERE
+				categoryIDPath <> <cfqueryparam cfsqltype="cf_sql_varchar" value="#oldCategoryIDPath#" />
+			  AND
+				categoryIDPath LIKE <cfqueryparam cfsqltype="cf_sql_varchar" value="#oldCategoryIDPath#%" />
+		</cfquery>
+		
+		
+		<cfloop query="rs">
+			<cfquery name="rs2">
+				UPDATE
+					SwCategory
+				SET
+					categoryIDPath = <cfqueryparam cfsqltype="cf_sql_varchar" value="#replace(rs.categoryIDPath, arguments.oldCategoryIDPath, arguments.newCategoryIDPath)#">
+				WHERE
+					categoryID = <cfqueryparam cfsqltype="cf_sql_varchar" value="#rs.categoryID#">
+			</cfquery>
+		</cfloop>
+		
+	</cffunction>
+	
 	<cffunction name="updateOldSlatwallContentIDPath">
 		<cfargument name="oldContentIDPath" type="string" default="" />
 		<cfargument name="newContentIDPath" type="string" default="" />
@@ -1043,12 +1167,15 @@
 				SELECT
 					tcontentcategories.categoryID,
 					tcontentcategories.parentID,
-					tcontentcategories.name
+					tcontentcategories.name,
+					tcontentcategories.urltitle
 				FROM
 					tcontentcategories
 				  LEFT JOIN
 				  	SwCategory on tcontentcategories.categoryID = SwCategory.cmsCategoryID
 				WHERE
+					tcontentcategories.siteID = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.muraSiteID#" />
+				  AND
 					SwCategory.categoryID is null
 				ORDER BY
 					<cfif $.slatwall.getApplicationValue("databaseType") eq "MySQL" OR  $.slatwall.getApplicationValue("databaseType") eq "Oracle10g">
@@ -1071,13 +1198,15 @@
 							categoryIDPath,
 							siteID,
 							cmsCategoryID,
-							categoryName
+							categoryName,
+							urlTitle
 						) VALUES (
 							<cfqueryparam cfsqltype="cf_sql_varchar" value="#newCategoryID#" />,
 							<cfqueryparam cfsqltype="cf_sql_varchar" value="#newCategoryID#" />,
 							<cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.slatwallSiteID#" />,
 							<cfqueryparam cfsqltype="cf_sql_varchar" value="#missingCategoryQuery.categoryID#" />,
-							<cfqueryparam cfsqltype="cf_sql_varchar" value="#missingCategoryQuery.name#" />
+							<cfqueryparam cfsqltype="cf_sql_varchar" value="#missingCategoryQuery.name#" />,
+							<cfqueryparam cfsqltype="cf_sql_varchar" value="#missingCategoryQuery.urltitle#" />
 						)
 					</cfquery>
 				<!--- Creating Internal Page, or resetting if parent can't be found --->	
@@ -1104,14 +1233,16 @@
 								parentCategoryID,
 								siteID,
 								cmsCategoryID,
-								categoryName
+								categoryName,
+								urlTitle
 							) VALUES (
 								<cfqueryparam cfsqltype="cf_sql_varchar" value="#newCategoryID#" />,
 								<cfqueryparam cfsqltype="cf_sql_varchar" value="#parentMappingCache[ missingCategoryQuery.parentID ].categoryIDPath#,#newCategoryID#" />,
 								<cfqueryparam cfsqltype="cf_sql_varchar" value="#parentMappingCache[ missingCategoryQuery.parentID ].categoryID#" />,
 								<cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.slatwallSiteID#" />,
 								<cfqueryparam cfsqltype="cf_sql_varchar" value="#missingCategoryQuery.categoryID#" />,
-								<cfqueryparam cfsqltype="cf_sql_varchar" value="#missingCategoryQuery.name#" />
+								<cfqueryparam cfsqltype="cf_sql_varchar" value="#missingCategoryQuery.name#" />,
+								<cfqueryparam cfsqltype="cf_sql_varchar" value="#missingCategoryQuery.urltitle#" />
 							)
 						</cfquery>
 					</cfif>
@@ -1123,17 +1254,17 @@
 	
 	<cffunction name="syncMuraContentCategoryAssignment">
 		<cfargument name="muraSiteID" type="string" required="true" />
+		<cfargument name="muraContentID" type="string" default="" />
 		
 		<cflock name="slatwallSyncMuraContentCategoryAssignment_#arguments.muraSiteID#" timeout="60" throwontimeout="true">
 			
 			<cfset var allMissingAssignments = "" />
 			<cfset var rs = "" />
 			
-			<!--- Get the missing assingments --->
-			<cfquery name="allMissingAssignments">
+			<!--- Check for missing assignments --->
+			<cfquery name="rs">
 				SELECT
-					SwContent.contentID,
-					SwCategory.categoryID
+					count(SwContent.contentID) as missingCount
 				FROM
 					tcontentcategoryassign
 				  INNER JOIN
@@ -1143,42 +1274,88 @@
 				  LEFT JOIN
 				  	SwContentCategory on SwContentCategory.contentID = SwContent.contentID AND SwContentCategory.categoryID = SwCategory.categoryID
 				WHERE
+				<cfif len(arguments.muraContentID)>
+					tcontentcategoryassign.contentID = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.muraContentID#" />
+				  AND
+				</cfif>
 					SwContentCategory.contentID is null AND SwContentCategory.categoryID is null
 			</cfquery>
 			
-			<!--- Loop over missing assignments --->
-			<cfloop query="allMissingAssignments">
-				<cfquery name="rs">
-					INSERT INTO SwContentCategory (
-						contentID,
-						categoryID
-					) VALUES (
-						<cfqueryparam cfsqltype="cf_sql_varchar" value="#allMissingAssignments.contentID#" />,
-						<cfqueryparam cfsqltype="cf_sql_varchar" value="#allMissingAssignments.categoryID#" />
-					)
+			<cfif rs.missingCount gt 0>
+				<!--- Get the missing assingments --->
+				<cfquery name="allMissingAssignments">
+					SELECT
+						SwContent.contentID,
+						SwCategory.categoryID
+					FROM
+						tcontentcategoryassign
+					  INNER JOIN
+					  	SwContent on tcontentcategoryassign.contentID = SwContent.cmsContentID
+					  INNER JOIN
+					  	SwCategory on tcontentcategoryassign.categoryID = SwCategory.cmsCategoryID
+					  LEFT JOIN
+					  	SwContentCategory on SwContentCategory.contentID = SwContent.contentID AND SwContentCategory.categoryID = SwCategory.categoryID
+					WHERE
+						SwContentCategory.contentID is null AND SwContentCategory.categoryID is null
 				</cfquery>
-			</cfloop>
 				
-			<!--- Delete unneeded assignments --->
+				<!--- Loop over missing assignments --->
+				<cfloop query="allMissingAssignments">
+					<cfquery name="rs">
+						INSERT INTO SwContentCategory (
+							contentID,
+							categoryID
+						) VALUES (
+							<cfqueryparam cfsqltype="cf_sql_varchar" value="#allMissingAssignments.contentID#" />,
+							<cfqueryparam cfsqltype="cf_sql_varchar" value="#allMissingAssignments.categoryID#" />
+						)
+					</cfquery>
+				</cfloop>
+			</cfif>
+			
+			<!--- Check for extra assignments --->
 			<cfquery name="rs">
-				DELETE FROM
-					SwContentCategory
+				SELECT
+				    count(SwContentCategory.contentID) as extraCount
+				FROM
+				    SwContentCategory
+				  INNER JOIN
+				  	SwContent on SwContentCategory.contentID = SwContent.contentID
+				  INNER JOIN
+				  	SwCategory on SwContentCategory.categoryID = SwCategory.categoryID
+				  LEFT JOIN
+				  	tcontentcategoryassign on SwContent.cmsContentID = tcontentcategoryassign.contentID AND SwCategory.cmsCategoryID = tcontentcategoryassign.categoryID
 				WHERE
-					NOT EXISTS(
-						SELECT
-							tcontentcategoryassign.contentID
-						FROM
-							tcontentcategoryassign
-						  INNER JOIN
-						  	SwContent on tcontentcategoryassign.contentID = SwContent.cmsContentID
-						  INNER JOIN
-						  	SwCategory on tcontentcategoryassign.categoryID = SwCategory.cmsCategoryID
-						WHERE
-							SwContentCategory.contentID = SwContent.contentID
-						  AND
-						  	SwContentCategory.categoryID = SwCategory.categoryID
-				  	)
+				<cfif len(arguments.muraContentID)>
+					SwContent.cmsContentID = <cfqueryparam cfsqltype="cf_sql_varchar" value="#arguments.muraContentID#" />
+				  AND
+				</cfif>
+					tcontentcategoryassign.contentID is null
 			</cfquery>
+				
+			<cfif rs.extraCount gt 0>
+				
+				<!--- Delete unneeded assignments --->
+				<cfquery name="rs">
+					DELETE FROM
+						SwContentCategory
+					WHERE
+						NOT EXISTS(
+							SELECT
+								tcontentcategoryassign.contentID
+							FROM
+								tcontentcategoryassign
+							  INNER JOIN
+							  	SwContent on tcontentcategoryassign.contentID = SwContent.cmsContentID
+							  INNER JOIN
+							  	SwCategory on tcontentcategoryassign.categoryID = SwCategory.cmsCategoryID
+							WHERE
+								SwContentCategory.contentID = SwContent.contentID
+							  AND
+							  	SwContentCategory.categoryID = SwCategory.categoryID
+					  	)
+				</cfquery>
+			</cfif>
 			
 		</cflock>
 	</cffunction>

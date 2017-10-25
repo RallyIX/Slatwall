@@ -1,3 +1,5 @@
+<cfimport prefix="swa" taglib="../../../tags" />
+<cfimport prefix="hb" taglib="../../../org/Hibachi/HibachiTags" />
 <cfif thisTag.executionMode is "start">
 	<cfparam name="attributes.hibachiScope" type="struct" default="#request.context.fw.getHibachiScope()#" />
 	<cfparam name="attributes.permissionGroup" type="any" />
@@ -71,7 +73,7 @@
 			</tr>
 		</cfloop>
 		<cfloop array="#entityProperties#" index="propertyName">
-			<tr class="#rowClass#" onClick="$('.permission#lcase(subPropertyInheriting[ propertyName ])#').toggle();">
+			<tr class="#rowClass#" onClick="$('.permission#lcase(subPropertyInheriting[ propertyName ])#').toggleClass('hide');">
 				<cfif attributes.edit>
 					<cfset request.context.permissionFormIndex++ />
 					
@@ -97,7 +99,7 @@
 					<td></td>
 				</cfif>
 			</tr>
-			<cf_HibachiPermissionGroupPropertyPermissions permissionGroup="#attributes.permissionGroup#" entityName="#subPropertyInheriting[ propertyName ]#" entityPermissionDetails="#attributes.entityPermissionDetails#" parentIndex="#request.context.permissionFormIndex#" depth="#attributes.depth + 1#" edit="#attributes.edit#" />
+			<hb:HibachiPermissionGroupPropertyPermissions permissionGroup="#attributes.permissionGroup#" entityName="#subPropertyInheriting[ propertyName ]#" entityPermissionDetails="#attributes.entityPermissionDetails#" parentIndex="#request.context.permissionFormIndex#" depth="#attributes.depth + 1#" edit="#attributes.edit#" />
 		</cfloop>
 	</cfoutput>
 </cfif>

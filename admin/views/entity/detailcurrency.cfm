@@ -46,28 +46,21 @@
 Notes:
 
 --->
+<cfimport prefix="swa" taglib="../../../tags" />
+<cfimport prefix="hb" taglib="../../../org/Hibachi/HibachiTags" />
+
+
 <cfparam name="rc.currency" type="any" />
 <cfparam name="rc.edit" type="boolean" />
 
 <cfoutput>
-	<cf_HibachiEntityDetailForm object="#rc.currency#" edit="#rc.edit#" sRedirectAction="admin:entity.listcurrency">
-		<cf_HibachiEntityActionBar type="detail" object="#rc.currency#" edit="#rc.edit#"></cf_HibachiEntityActionBar>
+	<hb:HibachiEntityDetailForm object="#rc.currency#" edit="#rc.edit#" sRedirectAction="admin:entity.listcurrency">
+		<hb:HibachiEntityActionBar type="detail" object="#rc.currency#" edit="#rc.edit#"></hb:HibachiEntityActionBar>
+
+		<hb:HibachiEntityDetailGroup object="#rc.currency#">
+			<hb:HibachiEntityDetailItem view="admin:entity/currencytabs/basic" open="true" text="#$.slatwall.rbKey('admin.entity.producttabs.basic')#" />
+			<hb:HibachiEntityDetailItem property="currencyrates" />
+		</hb:HibachiEntityDetailGroup>
 		
-		<cf_HibachiPropertyRow>
-			<cf_HibachiPropertyList>
-				<cf_HibachiPropertyDisplay object="#rc.currency#" property="activeFlag" edit="#rc.edit#">
-				<cf_HibachiPropertyDisplay object="#rc.currency#" property="currencyCode">
-				<cf_HibachiPropertyDisplay object="#rc.currency#" property="currencyName">
-				<cf_HibachiPropertyDisplay object="#rc.currency#" property="currencySymbol" edit="#rc.edit#">
-				<cf_HibachiPropertyDisplay object="#rc.currency#" property="formattedExample">
-			</cf_HibachiPropertyList>
-		</cf_HibachiPropertyRow>
-		
-		<!---
-		<cf_HibachiTabGroup object="#rc.currency#">
-			<!--- <cf_HibachiTab view="admin:section/tabsfolder/view" /> --->
-		</cf_HibachiTabGroup>
-		--->
-		
-	</cf_HibachiEntityDetailForm>
+	</hb:HibachiEntityDetailForm>
 </cfoutput>

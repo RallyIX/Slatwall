@@ -49,6 +49,8 @@ Notes:
 
 component  extends="HibachiService" accessors="true" {
 
+	property name="currencyDAO" type="any";
+
 	// Cached in Application Scope
 	property name="europeanCentralBankRates" type="struct";
 
@@ -66,6 +68,17 @@ component  extends="HibachiService" accessors="true" {
 		return returnList;
 	}
 	
+	public string function getCurrencyRatesByCurrencyCodeSmartlist(required string currencyCode){
+		var rates=this.getCurrencySmartList();
+		rates.addFilter('activeFlag',1);
+		rates.addFilter('currencyCode',arguments.currencyCode);
+		return rates;
+	}
+
+	public any function getCurrencyByCurrencyCode(required string currencyCode){
+		return getCurrencyDAO().getCurrencyByCurrencyCode(arguments.currencyCode);
+	}
+	
 	public array function getCurrencyOptions() {
 		var csl = this.getCurrencySmartList();
 		
@@ -76,18 +89,28 @@ component  extends="HibachiService" accessors="true" {
 		return csl.getRecords(); 
 	}
 	
-	public numeric function convertCurrency(required numeric amount, required originalCurrencyCode, required convertToCurrencyCode) {
-		// If an integration exists for currency conversion, then pass to that integration
-		// TODO: Add integration support
-		
+	public numeric function convertCurrency(required numeric amount, required originalCurrencyCode, required convertToCurrencyCode, conversionDateTime=now()) {
+		return round(precisionEvaluate(arguments.amount * getCurrencyConversionRate(originalCurrencyCode=originalCurrencyCode, convertToCurrencyCode=convertToCurrencyCode, conversionDateTime=arguments.conversionDateTime))*100)/100;
+	}
+	
+	public numeric function getCurrencyConversionRate(required originalCurrencyCode, required convertToCurrencyCode, conversionDateTime=now()) {
+		// First, check to see if there is a conversion record stored locally.
+		var currencyRate = getCurrencyDAO().getCurrentCurrencyRateByCurrencyCodes(originalCurrencyCode=arguments.originalCurrencyCode, convertToCurrencyCode=arguments.convertToCurrencyCode, conversionDateTime=arguments.conversionDateTime);
+		if(!isNull(currencyRate)) {
+			if(currencyRate.getConversionCurrencyCode() == arguments.convertToCurrencyCode) {
+				return currencyRate.getConversionRate();
+			} else if (currencyRate.getCurrencyCode() == arguments.convertToCurrencyCode) {
+				return precisionEvaluate(1 / currencyRate.getConversionRate());
+			}
+		}
 		
 		// If both currencyCodes exist in the European Central Bank list then convert based on that info
 		var cbRates = getEuropeanCentralBankRates();
 		if( ( structKeyExists(cbRates, arguments.originalCurrencyCode) || arguments.originalCurrencyCode eq "EUR" ) && ( structKeyExists(cbRates, arguments.convertToCurrencyCode) || arguments.convertToCurrencyCode eq "EUR" ) ) {
 			if(arguments.originalCurrencyCode eq "EUR") {
-				var amountInEUR = arguments.amount;	
+				var amountInEUR = 1;	
 			} else {
-				var amountInEUR = arguments.amount / cbRates[ arguments.originalCurrencyCode ];
+				var amountInEUR = 1 / cbRates[ arguments.originalCurrencyCode ];
 			}
 			
 			if(arguments.convertToCurrencyCode eq "EUR") {
@@ -98,7 +121,7 @@ component  extends="HibachiService" accessors="true" {
 		}
 		
 		// If no conversion could be done, just return the original amount
-		return arguments.amount;
+		return 1;
 	}
 	
 	public struct function getEuropeanCentralBankRates() {
@@ -125,6 +148,7 @@ component  extends="HibachiService" accessors="true" {
 				
 				variables.europeanCentralBankRates = duplicate(newDetails);	
 			} catch (any e) {
+				variables.europeanCentralBankRates = {};	
 			}
 		}
 		return variables.europeanCentralBankRates;

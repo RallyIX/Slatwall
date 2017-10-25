@@ -72,11 +72,11 @@ component entityname="SlatwallFile" table="SwFile" persistent="true" accessors="
 	// Remote Properties    
 	property name="remoteID" ormtype="string";    
 	    
-	// Audit Properties    
-	property name="createdDateTime" ormtype="timestamp";    
-	property name="createdByAccount" cfc="Account" fieldtype="many-to-one" fkcolumn="createdByAccountID";    
-	property name="modifiedDateTime" ormtype="timestamp";    
-	property name="modifiedByAccount" cfc="Account" fieldtype="many-to-one" fkcolumn="modifiedByAccountID";    
+	// Audit Properties
+	property name="createdDateTime" hb_populateEnabled="false" ormtype="timestamp";
+	property name="createdByAccountID" hb_populateEnabled="false" ormtype="string";
+	property name="modifiedDateTime" hb_populateEnabled="false" ormtype="timestamp";
+	property name="modifiedByAccountID" hb_populateEnabled="false" ormtype="string";  
 	    
 	// Non-Persistent Properties    
 	property name="fileUpload" type="string" persistent="false" hb_formFieldType="file";
@@ -95,9 +95,14 @@ component entityname="SlatwallFile" table="SwFile" persistent="true" accessors="
 	    
 	// ============ START: Non-Persistent Property Methods =================    
 	
+	public string function getFileDirectory()
+	{
+		return setting('globalAssetsFileFolderPath');
+	}
+	
 	public string function getFilePath()
 	{
-		return setting('globalAssetsFileFolderPath') & "/#getFileID()#.cfm";
+		return "#getFileDirectory()#/#getFileID()#.cfm";
 	}
 	
 	// ============  END:  Non-Persistent Property Methods =================    
@@ -143,7 +148,7 @@ component entityname="SlatwallFile" table="SwFile" persistent="true" accessors="
 	// ==================  END:  Overridden Methods ========================    
 	    
 	// =================== START: ORM Event Hooks  =========================    
-	    
+	  
 	// ===================  END:  ORM Event Hooks  =========================    
 	    
 	// ================== START: Deprecated Methods ========================    

@@ -73,17 +73,17 @@ component displayname="Schedule" entityname="SlatwallSchedule" table="SwSchedule
 	
 	// Audit Properties
 	property name="createdDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="createdByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="createdByAccountID";
+	property name="createdByAccountID" hb_populateEnabled="false" ormtype="string";
 	property name="modifiedDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="modifiedByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="modifiedByAccountID";
+	property name="modifiedByAccountID" hb_populateEnabled="false" ormtype="string";
 	
 	// Non-Persistent Properties
 	
 	public array function getRecuringTypeOptions() {
 		var options = [
-			{name="Daily", value="daily"},
-			{name="Weekly", value="weekly"},
-			{name="Monthly", value="monthly"}
+			{"name"="Daily", "value"="daily"},
+			{"name"="Weekly", "value"="weekly"},
+			{"name"="Monthly", "value"="monthly"}
 		];
 		return options;
 	}
@@ -112,7 +112,7 @@ component displayname="Schedule" entityname="SlatwallSchedule" table="SwSchedule
 	public string function getNextRunDateTime(startDateTime, endDateTime){
 		var nextRun='';
 		
-		if( endDateTime > now() ){
+		if( isNull(arguments.endDateTime) || endDateTime > now() ){
 			
 			switch(getRecuringType()){
 				
@@ -271,7 +271,7 @@ component displayname="Schedule" entityname="SlatwallSchedule" table="SwSchedule
 						nextDay='';
 						
 						for(i=1; i <= listLen(getDaysOfMonthToRun()); i++){
-							if(listgetAt(getDaysOfMonthToRun(),i) > day(now)){
+							if(listgetAt(getDaysOfMonthToRun(),i) > day(now())){
 								nextDay=listGetAt(getDaysOfMonthToRun(),i);
 							}
 						}
@@ -293,7 +293,7 @@ component displayname="Schedule" entityname="SlatwallSchedule" table="SwSchedule
 		}
 		
 		// If next run is after the end time then it will not be run again
-		if(nextRun > endDateTime){
+		if(!isNull(arguments.endDateTime) && nextRun > endDateTime){
 			nextRun='';
 		}
 		

@@ -71,11 +71,11 @@ component displayname="Image" entityname="SlatwallImage" table="SwImage" persist
 	// Remote properties
 	property name="remoteID" ormtype="string";
 	
-	// Audit properties
+	// Audit Properties
 	property name="createdDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="createdByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="createdByAccountID";
+	property name="createdByAccountID" hb_populateEnabled="false" ormtype="string";
 	property name="modifiedDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="modifiedByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="modifiedByAccountID";
+	property name="modifiedByAccountID" hb_populateEnabled="false" ormtype="string";
 	
 	public string function getImageFileUploadDirectory() {
 		return setting('globalAssetsImageFolderPath') & "/" & getDirectory();
@@ -217,7 +217,7 @@ component displayname="Image" entityname="SlatwallImage" table="SwImage" persist
 		smartList.setSelectDistinctFlag(1);
 		smartList.addFilter("optionGroup.imageGroupFlag",1);
 		smartList.addFilter("skus.product.productID",this.getProduct().getProductID());
-		smartList.addOrder("optionGroup.sortOrder|ASC,sortOrder|ASC");
+		smartList.addOrder("optionGroup|ASC,sortOrder|ASC");
 		return smartList;
 	}
 	

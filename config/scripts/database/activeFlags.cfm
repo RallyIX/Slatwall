@@ -67,7 +67,23 @@ Notes:
 	UPDATE SwProductType SET activeFlag = <cfqueryparam cfsqltype="cf_sql_bit" value="1"> WHERE activeFlag is NULL
 </cfquery>
 
+<!--- Integration --->
+<cfquery name="local.activeFlag">
+	UPDATE SwIntegration SET activeFlag = <cfqueryparam cfsqltype="cf_sql_bit" value="0"> WHERE activeFlag is NULL
+</cfquery>
+
+<!--- Shipping Rate --->
+<cfquery name="local.activeFlag">
+	UPDATE SwShippingMethodRate SET activeFlag = <cfqueryparam cfsqltype="cf_sql_bit" value="1"> WHERE activeFlag is NULL
+</cfquery>
+
 <!--- Sku --->
 <cfquery name="local.activeFlag">
 	UPDATE SwSku SET activeFlag = <cfqueryparam cfsqltype="cf_sql_bit" value="1"> WHERE activeFlag is NULL
 </cfquery>
+
+<!--- Account Authentication --->
+<cfquery name="local.activeFlag">
+	UPDATE SwAccountAuthentication SET activeFlag = <cfqueryparam cfsqltype="cf_sql_bit" value="1"> WHERE activeFlag is NULL
+</cfquery>
+

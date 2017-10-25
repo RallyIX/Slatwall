@@ -46,7 +46,7 @@
 Notes:
 
 */
-component displayname="Account Email Address" entityname="SlatwallAccountEmailAddress" table="SwAccountEmailAddress" persistent="true" accessors="true" output="false" extends="HibachiEntity" cacheuse="transactional" hb_serviceName="accountService" hb_permission="account.accountEmailAddresses" {
+component displayname="Account Email Address" entityname="SlatwallAccountEmailAddress" table="SwAccountEmailAddress" persistent="true" accessors="true" output="false" extends="HibachiEntity" cacheuse="transactional" hb_serviceName="accountService" hb_permission="account.accountEmailAddresses" hb_processContext="sendVerificationEmail,verify" {
 	
 	// Persistent Properties
 	property name="accountEmailAddressID" ormtype="string" length="32" fieldtype="id" generator="uuid" unsavedvalue="" default="";
@@ -71,9 +71,9 @@ component displayname="Account Email Address" entityname="SlatwallAccountEmailAd
 	
 	// Audit Properties
 	property name="createdDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="createdByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="createdByAccountID";
+	property name="createdByAccountID" hb_populateEnabled="false" ormtype="string";
 	property name="modifiedDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="modifiedByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="modifiedByAccountID";
+	property name="modifiedByAccountID" hb_populateEnabled="false" ormtype="string";
 	
 	// Non Persistent
 	property name="primaryEmailAddressNotInUseFlag" persistent="false";

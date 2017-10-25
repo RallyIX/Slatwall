@@ -52,6 +52,8 @@ component extends="HibachiService" output="false" accessors="true"{
 	property name="subscriptionService" type="any";
 	property name="skuService" type="any";
 	
+	property name="taskDAO" type="any";
+	
 	// ===================== START: Logical Methods ===========================
 	
 	public void function updateEntityCalculatedProperties(required any entityName, struct smartListData={}) {
@@ -124,22 +126,24 @@ component extends="HibachiService" output="false" accessors="true"{
 			threadData.taskData = deserializeJSON(arguments.task.getTaskConfig());
 		}
 		
-		thread action="run" name="taskThread" threadData="#threadData#" {
+		thread action="run" name="taskThread-#createUUID()#" threadData="#threadData#" {
 			
 			// Create a new taskHistory to be logged
 			var taskHistory = this.newTaskHistory();
 			
 			// Get the task from the DB
 			var task = this.getTask(attributes.threadData.taskID);
+			// Setup the task as running
+			getTaskDAO().updateTaskRunning( taskID=attributes.threadData.taskID, runningFlag=true );
 			
-			// Setup the task as running, and initial the taskHistory data
-			task.setRunningFlag( true );
+			// Initiate the taskHistory data
 			taskHistory.setTask( task );
 			taskHistory.setStartTime( now() );
-			
-			// Persist the info to the DB
-			getHibachiDAO().flushORMSession();
 
+			// Persist the info to the DB
+			taskHistory = this.saveTaskHistory( taskHistory );
+			getHibachiDAO().flushORMSession();
+			
 			// Run the task inside of a try/catch so that errors are logged
 			try{
 				
@@ -164,11 +168,14 @@ component extends="HibachiService" output="false" accessors="true"{
 				taskHistory.setResponse( e.Message );
 			}
 			
-			// Update the task, and set the end for history
-			task.setRunningFlag( false );
+			// Set the task as no longer running
+			getTaskDAO().updateTaskRunning( taskID=attributes.threadData.taskID, runningFlag=false );
+			
+			// Set the end for history
 			taskHistory.setEndTime( now() );
 			
 			// Persist the info to the DB
+			taskHistory = this.saveTaskHistory( taskHistory );
 			getHibachiDAO().flushORMSession();
 			
 			// If there was a taskSchedule, then we can update it
@@ -183,7 +190,7 @@ component extends="HibachiService" output="false" accessors="true"{
 			
 			// Call save on the task history
 			taskHistory = this.saveTaskHistory( taskHistory );
-			
+
 			// Create success or failure email, and also log results
 			if(taskHistory.getSuccessFlag()) {
 				getEmailService().generateAndSendFromEntityAndEmailTemplateID(entity=task,emailTemplateID=task.setting('taskSuccessEmailTemplate'));
@@ -208,8 +215,17 @@ component extends="HibachiService" output="false" accessors="true"{
 	public any function processTask_subscriptionUsageRenew(required any task) {
 		var subscriptionUsages = getSubscriptionService().getSubscriptionUsageForRenewal();
 		
+		var data = {
+			autoUpdateFlag = true
+		};
+		
 		for(var subscriptionUsage in subscriptionUsages) {
-			subscriptionUsage = getService("subscriptionService").processSubscriptionUsage(subscriptionUsage, {}, 'renew');
+			if(!isnull(subscriptionUsage.getAutoRenewFlag()) && subscriptionUsage.getAutoRenewFlag()){
+				subscriptionUsage = getService("subscriptionService").processSubscriptionUsage(subscriptionUsage, data, 'renew');
+			}else{
+				subscriptionUsage = getService("subscriptionService").processSubscriptionUsage(subscriptionUsage, {}, 'updateStatus');
+			}
+			
 		}
 		
 		return arguments.task;

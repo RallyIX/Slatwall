@@ -134,7 +134,22 @@ component accessors="true" output="false" displayname="PayFlowPro" implements="S
 		httpRequest.addParam(type="header",name="Accept",VALUE="application/xml");
 		httpRequest.addParam(type="body",value="#trim(requestXML)#");
 		
-		var response = httpRequest.send().getPrefix();
+		if(structKeyExists(server, 'coldfusion') && Left(server.coldfusion.productVersion, '1') == 9){
+			var objSecurity = createObject("java", "java.security.Security");
+			var storeProvider = objSecurity.getProvider("JsafeJCE");
+			objSecurity.removeProvider("JsafeJCE");
+			
+			try{
+				var response = httpRequest.send().getPrefix();
+				
+				objSecurity.insertProviderAt(storeProvider, 1) ;
+			}catch (any e){
+				objSecurity.insertProviderAt(storeProvider, 1) ;
+				rethrow;
+			}
+		}else {
+			var response = httpRequest.send().getPrefix();
+		}
 		
 		return response;
 	}
@@ -189,6 +204,7 @@ component accessors="true" output="false" displayname="PayFlowPro" implements="S
 			response.addError(responseData.ProcStatus.xmlText, responseData.StatusMsg.xmlText);
 		} else if(structKeyExists(responseData,"ApprovalStatus") && responseData.ApprovalStatus.xmlText != 1) {
 			// Transaction was not approved
+			response.setStatusCode( responseData.RespCode.xmlText );
 			response.addError(responseData.RespCode.xmlText, responseData.StatusMsg.xmlText);
 		} else {
 			if(requestBean.getTransactionType() == "authorize") {

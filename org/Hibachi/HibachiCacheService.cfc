@@ -13,7 +13,7 @@ component accessors="true" output="false" extends="HibachiService" {
 		if(structKeyExists(hibachiConfig, "useCachingEngineFlag") && hibachiConfig.useCachingEngineFlag) {
 			setInternalCacheFlag( false );
 		}
-		if(structKeyExists(server,"railo")) {
+		if(structKeyExists(server,"railo") || structKeyExists(server,'lucee')) {
 			setRailoFlag( true );	
 		}
 		
@@ -77,6 +77,9 @@ component accessors="true" output="false" extends="HibachiService" {
 	public any function resetCachedKey( required string key ) {
 		// If using the internal cache, then reset there
 		if(getInternalCacheFlag()) {
+			if(!structKeyExists(getCache(), arguments.key)) {
+				getCache()[ arguments.key ] = {};	
+			}
 			getCache()[ arguments.key ].reset = true;
 			
 		// If using the external cache, then reset there
@@ -84,9 +87,12 @@ component accessors="true" output="false" extends="HibachiService" {
 			var tuple = {
 				reset = true
 			};
-			if(arrayFindNoCase(cacheGetAllIDs(), arguments.key)) {
+			
+			// Done in a try catch in case the value doesn't exist
+			try{
 				tuple.value = cacheGet( arguments.key ).value;
-			}
+			} catch(any e){};
+			
 			cachePut( arguments.key, tuple );
 		}
 	}

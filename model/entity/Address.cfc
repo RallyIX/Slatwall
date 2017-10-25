@@ -72,26 +72,17 @@ component displayname="Address" entityname="SlatwallAddress" table="SwAddress" p
 	// Remote properties
 	property name="remoteID" ormtype="string";
 	
-	// Audit properties
+	// Audit Properties
 	property name="createdDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="createdByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="createdByAccountID";
+	property name="createdByAccountID" hb_populateEnabled="false" ormtype="string";
 	property name="modifiedDateTime" hb_populateEnabled="false" ormtype="timestamp";
-	property name="modifiedByAccount" hb_populateEnabled="false" cfc="Account" fieldtype="many-to-one" fkcolumn="modifiedByAccountID";
+	property name="modifiedByAccountID" hb_populateEnabled="false" ormtype="string";
 	
 	// Non Persistent Properties
 	property name="country" persistent="false";
 	property name="countryCodeOptions" persistent="false" type="array";
 	property name="salutationOptions" persistent="false" type="array";
 	property name="stateCodeOptions" persistent="false" type="array";
-	
-	public any function init() {
-		if(isNull(variables.countryCode)) {
-			variables.countryCode = "US";
-		}
-		
-		return super.init();
-	}
-	
 	
 	// ==================== START: Logical Methods =========================
 	
@@ -119,7 +110,7 @@ component displayname="Address" entityname="SlatwallAddress" table="SwAddress" p
 		return true;
 	}
 	
-	public any function copyAddress( saveNewAddress=false ) {
+	public any function copyAddress( saveNewAddress=true ) {
 		return getService("addressService").copyAddress( this, arguments.saveNewAddress );
 	}
 	
@@ -137,15 +128,36 @@ component displayname="Address" entityname="SlatwallAddress" table="SwAddress" p
 		return address;
 	}
 	
+	public any function populateFromAddressValueCopy(required any sourceAddress) {
+		this.setName( arguments.sourceAddress.getName() );
+		this.setCompany( arguments.sourceAddress.getCompany() );
+		this.setStreetAddress( arguments.sourceAddress.getStreetAddress() );
+		this.setStreet2Address( arguments.sourceAddress.getStreet2Address() );
+		this.setLocality( arguments.sourceAddress.getLocality() );
+		this.setCity( arguments.sourceAddress.getCity() );
+		this.setStateCode( arguments.sourceAddress.getStateCode() );
+		this.setPostalCode( arguments.sourceAddress.getPostalCode() );
+		this.setCountryCode( arguments.sourceAddress.getCountryCode() );
+		this.setSalutation( arguments.sourceAddress.getSalutation() );
+		this.setFirstName( arguments.sourceAddress.getFirstName() );
+		this.setLastName( arguments.sourceAddress.getLastName() );
+		this.setMiddleName( arguments.sourceAddress.getMiddleName() );
+		this.setMiddleInitial( arguments.sourceAddress.getMiddleInitial() );
+		this.setPhoneNumber( arguments.sourceAddress.getPhoneNumber() );
+		this.setEmailAddress( arguments.sourceAddress.getEmailAddress() );
+	}
+	
 	// ====================  END: Logical Methods ==========================
 	
 	// ============ START: Non-Persistent Property Methods =================
 	
 	public any function getCountry() {
-		if(!structKeyExists(variables, "country")) {
+		if(!structKeyExists(variables, "country") && !isNull(getCountryCode())) {
 			variables.country = getService("addressService").getCountry(getCountryCode());
 		}
-		return variables.country;
+		if(structKeyExists(variables, "country")) {
+			return variables.country;	
+		}
 	}
 	
 	public array function getCountryCodeOptions() {
@@ -166,7 +178,11 @@ component displayname="Address" entityname="SlatwallAddress" table="SwAddress" p
 			var smartList = getService("addressService").getStateSmartList();
 			smartList.addSelect(propertyIdentifier="stateName", alias="name");
 			smartList.addSelect(propertyIdentifier="stateCode", alias="value");
-			smartList.addFilter("countryCode", getCountryCode()); 
+			if(!isNull(getCountryCode())) {
+				smartList.addFilter("countryCode", getCountryCode());	
+			} else {
+				smartList.addFilter("countryCode", 'US');
+			}
 			smartList.addOrder("stateName|ASC");
 			variables.stateCodeOptions = smartList.getRecords();
 			arrayPrepend(variables.stateCodeOptions, {value="", name=rbKey('define.select')});
@@ -209,6 +225,7 @@ component displayname="Address" entityname="SlatwallAddress" table="SwAddress" p
 			if(!isNull(getLastName())) {
 				name = listAppend(name, getLastName(), " ");
 			}
+			return name;
 		} 
 	}
 	

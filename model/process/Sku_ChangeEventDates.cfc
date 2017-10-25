@@ -52,16 +52,11 @@ component output="false" accessors="true" extends="HibachiProcess" {
 	property name="sku";
 
 	// Data Properties
-	property name="eventStartTime" hb_formFieldType="time";
-	property name="eventEndTime" hb_formFieldType="time";
-	property name="reservationStartTime" hb_formFieldType="time";
-	property name="reservationEndTime" hb_formFieldType="time";
+	property name="eventStartDateTime" hb_formFieldType="datetime";
+  	property name="eventEndDateTime" hb_formFieldType="datetime";
+  	property name="startReservationDateTime" hb_formFieldType="datetime";
+  	property name="endReservationDateTime" hb_formFieldType="datetime";
 	property name="locationConfigurations";
-	
-	property name="_eventStartDateTime" hb_rbKey="entity.sku.eventStartDateTime" hb_formFieldType="datetime";
-	property name="_eventEndDateTime" hb_rbKey="entity.sku.eventEndDateTime" hb_formFieldType="datetime";
-	property name="_startReservationDateTime" hb_rbKey="entity.sku.startReservationDateTime" hb_formFieldType="datetime";
-	property name="_endReservationDateTime" hb_rbKey="entity.sku.endReservationDateTime" hb_formFieldType="datetime";
 	
 	// Scheduling-related properties
 	property name="editScope" hb_formFieldType="select" hint="Edit this sku schedule or all?";
@@ -79,38 +74,6 @@ component output="false" accessors="true" extends="HibachiProcess" {
 		];
 
 		return options;
-	}
-	
-	public any function getEventStartDateTime() {
-		if(len(this.get_eventStartDateTime())) {
-			return dateTimePickerFormat(this.get_eventStartDateTime());
-		} else {
-			return dateTimePickerFormat(this.getSku().getEventStartDateTime());
-		}	
-	}
-	
-	public any function getEventEndDateTime() {
-		if(len(this.get_eventEndDateTime())) {
-			return dateTimePickerFormat(this.get_eventEndDateTime());
-		} else {
-			return dateTimePickerFormat(this.getSku().getEventEndDateTime());
-		}	
-	}
-	
-	public any function getStartReservationDateTime() {
-		if(len(this.get_startReservationDateTime())) {
-			return dateTimePickerFormat(this.get_startReservationDateTime());
-		} else {
-			return dateTimePickerFormat(this.getSku().getStartReservationDateTime());
-		}	
-	}
-	
-	public any function getEndReservationDateTime() {
-		if(len(this.get_endReservationDateTime())) {
-			return dateTimePickerFormat(this.get_endReservationDateTime());
-		} else {
-			return dateTimePickerFormat(this.getSku().getEndReservationDateTime());
-		}	
 	}
 	
 	public any function dateTimePickerFormat(required theDate) {
@@ -135,7 +98,7 @@ component output="false" accessors="true" extends="HibachiProcess" {
 	
 	public any function getScheduleEndDate() {
 		var result = "";
-		if(sku.hasProductSchedule() && sku.getProductSchedule().getScheduleEndType().getTypeID() == getService("SettingService").getTypeBySystemCode("setDate").getTypeID()) {
+		if(sku.hasProductSchedule() && sku.getProductSchedule().getScheduleEndType().getTypeID() == getService("typeService").getTypeBySystemCode("setDate").getTypeID()) {
 			result = sku.getProductSchedule().getScheduleEndDate();
 		}
 		return result;
@@ -144,7 +107,7 @@ component output="false" accessors="true" extends="HibachiProcess" {
 	public any function getScheduleEndOccurrences() {
 		var result = 1;
 		if(sku.hasProductSchedule()) {
-			if(sku.getProductSchedule().getScheduleEndType().getTypeID() == getService("SettingService").getTypeBySystemCode("setOccurrences").getTypeID()) {
+			if(sku.getProductSchedule().getScheduleEndType().getTypeID() == getService("typeService").getTypeBySystemCode("setOccurrences").getTypeID()) {
 				result = sku.getProductSchedule().getScheduleEndOccurrences();
 			} else {
 				result = "";

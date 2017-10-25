@@ -36,7 +36,7 @@
 Notes:
 
 */
-component displayname="AccountLoyaltyTransaction" entityname="SlatwallAccountLoyaltyTransaction" table="SwAccountLoyaltyTransaction" persistent="true"  extends="HibachiEntity" cacheuse="transactional" hb_serviceName="accountService" hb_permission="account.accountLoyaltyTransaction" {
+component displayname="AccountLoyaltyTransaction" entityname="SlatwallAccountLoyaltyTransaction" table="SwAccountLoyaltyTransaction" persistent="true"  extends="HibachiEntity" cacheuse="transactional" hb_serviceName="accountService" hb_permission="account.accountLoyaltyTransaction" hb_processContext="create" {
 	
 	// Persistent Properties
 	property name="accountLoyaltyTransactionID" ormtype="string" length="32" fieldtype="id" generator="uuid" unsavedvalue="" default="";
@@ -59,10 +59,10 @@ component displayname="AccountLoyaltyTransaction" entityname="SlatwallAccountLoy
 	property name="remoteID" ormtype="string";
 	
 	// Audit Properties
-	property name="createdDateTime" ormtype="timestamp";
-	property name="createdByAccount" cfc="Account" fieldtype="many-to-one" fkcolumn="createdByAccountID";
-	property name="modifiedDateTime" ormtype="timestamp";
-	property name="modifiedByAccount" cfc="Account" fieldtype="many-to-one" fkcolumn="modifiedByAccountID";
+	property name="createdDateTime" hb_populateEnabled="false" ormtype="timestamp";
+	property name="createdByAccountID" hb_populateEnabled="false" ormtype="string";
+	property name="modifiedDateTime" hb_populateEnabled="false" ormtype="timestamp";
+	property name="modifiedByAccountID" hb_populateEnabled="false" ormtype="string";
 	
 	// Non-Persistent Properties
 	
@@ -186,7 +186,7 @@ component displayname="AccountLoyaltyTransaction" entityname="SlatwallAccountLoy
 			arrayAppend(arguments.orderFulfillment.getAccountLoyaltyTransactions(), this);
 		}
 	}
-	public void function removeOrderFulfillment(any order) {
+	public void function removeOrderFulfillment(any orderFulfillment) {
 		if(!structKeyExists(arguments, "orderFulfillment")) {
 			arguments.orderFulfillment = variables.orderFulfillment;
 		}

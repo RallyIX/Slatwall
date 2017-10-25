@@ -65,7 +65,28 @@ Notes:
 	<cffunction name="getDimensionDefinitions">
 		<cfreturn [
 			{alias='taxCategoryName', title=rbKey('entity.taxCategory.taxCategoryName')},
-			{alias='taxRate', title=rbKey('entity.taxCategoryRate.taxRate')}
+			{alias='taxCategoryCode', title=rbKey('entity.taxCategory.taxCategoryCode')},
+			{alias='taxCategoryRateCode', title=rbKey('entity.taxCategoryRate.taxCategoryRateCode')},
+			{alias='taxRate', title=rbKey('entity.taxApplied.taxRate')},
+			{alias='taxAmount', title=rbKey('entity.taxApplied.taxAmount')},
+			{alias='taxLiabilityAmount', title=rbKey('entity.taxApplied.taxLiabilityAmount')},
+			{alias='currencyCode', title=rbKey('entity.taxApplied.currencyCode')},
+			{alias='taxImpositionName', title=rbKey('entity.taxApplied.taxImpositionName')},
+			{alias='taxImpositionType', title=rbKey('entity.taxApplied.taxImpositionType')},
+			{alias='taxJurisdictionName', title=rbKey('entity.taxApplied.taxJurisdictionName')},
+			{alias='taxJurisdictionType', title=rbKey('entity.taxApplied.taxJurisdictionType')},
+			{alias='taxStreetAddress', title=rbKey('entity.taxApplied.taxStreetAddress')},
+			{alias='taxStreet2Address', title=rbKey('entity.taxApplied.taxStreet2Address')},
+			{alias='taxLocality', title=rbKey('entity.taxApplied.taxLocality')},
+			{alias='taxCity', title=rbKey('entity.taxApplied.taxCity')},
+			{alias='taxStateCode', title=rbKey('entity.taxApplied.taxStateCode')},
+			{alias='taxPostalCode', title=rbKey('entity.taxApplied.taxPostalCode')},
+			{alias='taxCountryCode', title=rbKey('entity.taxApplied.taxCountryCode')},
+			{alias='orderID', title=rbKey('entity.order.orderID')},
+			{alias='orderNumber', title=rbKey('entity.order.orderNumber')},
+			{alias='referencedOrderID', title=rbKey('entity.order.referencedOrderID')},
+			{alias='referencedOrderNumber', title=rbKey('entity.order.referencedOrderNumber')},
+			{alias='fulfillmentMethodName', title=rbKey('entity.fulfillmentMethod.fulfillmentMethodName')}
 		] />
 	</cffunction>
 	
@@ -73,9 +94,24 @@ Notes:
 		<cfif not structKeyExists(variables, "data")>
 			<cfquery name="variables.data">
 				SELECT
-					SwTaxApplied.taxAmount,
-					SwTaxApplied.taxRate,
 					SwTaxCategory.taxCategoryName,
+					SwTaxCategory.taxCategoryCode,
+					SwTaxCategoryRate.taxCategoryRateCode,
+					SwTaxApplied.taxRate,
+					SwTaxApplied.taxAmount,
+					SwTaxApplied.taxLiabilityAmount,
+					SwTaxApplied.currencyCode,
+					SwTaxApplied.taxImpositionName,
+					SwTaxApplied.taxImpositionType,
+					SwTaxApplied.taxJurisdictionName,
+					SwTaxApplied.taxJurisdictionType,
+					SwTaxApplied.taxStreetAddress,
+					SwTaxApplied.taxStreet2Address,
+					SwTaxApplied.taxLocality,
+					SwTaxApplied.taxCity,
+					SwTaxApplied.taxStateCode,
+					SwTaxApplied.taxPostalCode,
+					SwTaxApplied.taxCountryCode,
 					SwSku.skuID,
 					SwSku.skuCode,
 					SwProduct.productID,
@@ -83,6 +119,10 @@ Notes:
 					SwProductType.productTypeID,
 					SwProductType.productTypeName,
 					SwOrder.orderID,
+					SwOrder.orderNumber,
+					ro.orderID as referencedOrderID,
+					ro.orderNumber as referencedOrderNumber,
+					SwFulfillmentMethod.fulfillmentMethodName,
 					SwAddress.countryCode,
 					SwAddress.stateCode,
 					SwAddress.city,
@@ -107,11 +147,13 @@ Notes:
 				  INNER JOIN
 				  	SwTaxCategoryRate on SwTaxApplied.taxCategoryRateID = SwTaxCategoryRate.taxCategoryRateID
 				  INNER JOIN
-				  	SwTaxCategory on SwTaxCategoryRate.taxCategoryID = SwTaxCategoryRate.taxCategoryID 
+				  	SwTaxCategory on SwTaxCategoryRate.taxCategoryID = SwTaxCategory.taxCategoryID 
 				  INNER JOIN
 					SwOrderItem on SwTaxApplied.orderItemID = SwOrderItem.orderItemID
 				  INNER JOIN
 				  	SwOrderFulfillment on SwOrderItem.orderFulfillmentID = SwOrderFulfillment.orderFulfillmentID
+				  INNER JOIN
+				  	SwFulfillmentMethod on SwOrderFulfillment.fulfillmentMethodID = SwFulfillmentMethod.fulfillmentMethodID
 				  INNER JOIN
 				  	SwOrder on SwOrderFulfillment.orderID = SwOrder.orderID
 				  INNER JOIN
@@ -124,6 +166,8 @@ Notes:
 				  	SwProductType on SwProduct.productTypeID = SwProductType.productTypeID
 				  LEFT JOIN
 				  	SwAddress on SwOrderFulfillment.shippingAddressID = SwAddress.addressID
+				  LEFT JOIN
+				  	SwOrder ro on SwOrder.orderID = ro.referencedOrderID 
 				WHERE
 					SwOrder.orderOpenDateTime is not null
 				  AND

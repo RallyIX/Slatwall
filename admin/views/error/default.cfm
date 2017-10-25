@@ -46,5 +46,58 @@
 Notes:
 
 --->
-<cfdump var="#request.exception#" />
+
+<cfimport prefix="swa" taglib="../../../tags" />
+<cfimport prefix="hb" taglib="../../../org/Hibachi/HibachiTags" />
+<cftry>
+	<cfset local.errorDisplayFlag = false />
+	<cfset local.errorNotifyEmailAddresses = '' />
+	
+	<cfif structKeyExists(request, "slatwallScope")>
+		<cfset local.errorDisplayFlag = request.slatwallScope.getApplicationValue('errorDisplayFlag') />
+		<cfset local.errorNotifyEmailAddresses = request.slatwallScope.getApplicationValue('errorNotifyEmailAddresses') />
+	</cfif>
+	
+	<cfif local.errorDisplayFlag>
+		<cfdump var="#request.exception#" />
+	<cfelse>
+		<h1>There was an unexpected error while processing your request.</h1><br />
+		<cftry>
+			<cfif len(local.errorNotifyEmailAddresses)>
+				<cfsavecontent variable="local.errorText">
+					<cfoutput>
+					<h2>An error occurred</h2>
+					Template: http://#cgi.server_name##cgi.script_name#?#cgi.query_string#<br />
+					Time: #dateFormat(now(), "short")# #timeFormat(now(), "short")#<br />
+					Remote IP Address: #cgi.REMOTE_ADDR#<br />
+					<cfdump var="#request.exception#" label="Error">				
+					</cfoutput>
+				</cfsavecontent>
+				
+				<cfmail to="#local.errorNotifyEmailAddresses#" from="#listFirst(local.errorNotifyEmailAddresses)#" subject="Slatwall Error Notification" type="html">
+					#local.errorText#	
+				</cfmail>
+				<strong>An error notification email was sent to the administrator.</strong><br /><br />
+			<cfelse>
+				<strong>Please notify your system administrator.</strong><br /><br />
+			</cfif>
+			
+			<cfcatch>
+				Please notify your system administrator.<br /><br />
+				An error notification email was unable to be sent likely because of an invalid 'errorNotifyEmailAddresses' setting configuration<cfif isSimpleValue(local.errorNotifyEmailAddresses)> which is currently set to: <strong><cfoutput>#local.errorNotifyEmailAddresses#</cfoutput></strong> and should be a comma seperated list of email addresses (see below for example)</cfif><br /><br />
+			</cfcatch>
+		</cftry>
+	</cfif>
+	<cfcatch>
+		An Unexpected Error occured and the error cannot be displayed or emailed
+		<cfdump var="#cfcatch#" />
+	</cfcatch>
+</cftry>
+<hr />
+<br />
+To see errors, add the following line to /Slatwall/custom/config/configFramework.cfm:<br />
+<pre>&lt;cfset variables.framework.hibachi.errorDisplayFlag = true /&gt;</pre><br /><br />
+To have errors emailed you can add the following line to /Slatwall/custom/config/configFramework.cfm:<br />
+<pre>&lt;cfset variables.framework.hibachi.errorNotifyEmailAddresses = "admin1@mysite.com,admin2@mysite.com" /&gt;</pre>
+		
 <cfabort />

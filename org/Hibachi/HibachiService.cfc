@@ -1,4 +1,4 @@
-<cfcomponent accessors="true" extends="HibachiObject">
+<cfcomponent accessors="true" output="false" extends="HibachiObject">
 	
 	<!--- Import all of the Hibachi services and DAO's --->
 	<cfproperty name="hibachiDAO" type="any">
@@ -18,6 +18,7 @@
 	<cfset variables.entityObjects = {} />
 	<cfset variables.entityHasProperty = {} />
 	<cfset variables.entityHasAttribute = {} />
+	<cfset variables.processComponentDirectoryListing = [] />
 	
 	<cfscript>
 		public any function get(required string entityName, required any idOrFilter, boolean isReturnNewOnNotFound = false ) {
@@ -29,10 +30,24 @@
 			
 			if(structKeyExists(arguments.data, "keyword") || structKeyExists(arguments.data, "keywords")) {
 				var example = this.new(arguments.entityName);
-				smartList.addKeywordProperty(propertyIdentifier=example.getSimpleRepresentationPropertyName(), weight=1);
+				var simpleRepresentationPropertyName = example.getSimpleRepresentationPropertyName();
+				var primaryIDPropertyName = example.getPrimaryIDPropertyName();
+				var pmd = example.getPropertyMetaData( primaryIDPropertyName );
+				if(!structKeyExists(pmd, "ormtype") || pmd.ormtype != 'integer') {
+					smartList.addKeywordProperty(propertyIdentifier=primaryIDPropertyName, weight=1);	
+				}
+				if(simpleRepresentationPropertyName != primaryIDPropertyName) {
+					smartList.addKeywordProperty(propertyIdentifier=simpleRepresentationPropertyName, weight=1);	
+				}
 			}
 			
 			return smartList;
+		}
+		
+		public any function getCollectionList(string entityName, struct data={}){
+			var collection = getService('hibachiCollectionService').newCollection(argumentcollection=arguments);
+			collection.setCollectionObject(arguments.entityName);
+			return collection;
 		}
 		
 		public any function list(required string entityName, struct filterCriteria = {}, string sortOrder = '', struct options = {} ) {
@@ -48,6 +63,9 @@
 		}
 		
 		public boolean function delete(required any entity){
+			
+			// Add the entity by it's name to the arguments for calling events
+	    	arguments[ lcase(arguments.entity.getClassName()) ] = arguments.entity;
 			
 			// Announce Before Event
 			getHibachiEventService().announceEvent("before#arguments.entity.getClassName()#Delete", arguments);
@@ -98,7 +116,6 @@
 			
 			// If we pass preProcess validation then we can try to setup the processObject if the entity has one, and validate that
 			if(!arguments.entity.hasErrors() && arguments.entity.hasProcessObject(arguments.processContext)) {
-				
 				invokeArguments[ "processObject" ] = arguments.entity.getProcessObject(arguments.processContext);
 				
 				if(!invokeArguments[ "processObject" ].getPopulatedFlag()) {
@@ -122,7 +139,6 @@
 					throw("You have created a process method: #methodName# that does not return an entity.  All process methods should return an entity.");
 				}
 			}	
-
 			// Announce the after events
 			getHibachiEventService().announceEvent("after#arguments.entity.getClassName()#Process_#arguments.processContext#", invokeArguments);
 			if(arguments.entity.hasErrors()) {
@@ -130,7 +146,7 @@
 			} else {
 				getHibachiEventService().announceEvent("after#arguments.entity.getClassName()#Process_#arguments.processContext#Success", invokeArguments);
 			}
-
+			
 			return arguments.entity;
 		}
 		
@@ -140,6 +156,9 @@
 	    	if(!isObject(arguments.entity) || !arguments.entity.isPersistent()) {
 	    		throw("The entity being passed to this service is not a persistent entity. READ THIS!!!! -> Make sure that you aren't calling the oMM method with named arguments. Also, make sure to check the spelling of your 'fieldname' attributes.");
 	    	}
+	    	
+	    	// Add the entity by it's name to the arguments for calling events
+	    	arguments[ lcase(arguments.entity.getClassName()) ] = arguments.entity;
 	    	
 	    	// Announce Before Event
 	    	getHibachiEventService().announceEvent("before#arguments.entity.getClassName()#Save", arguments);
@@ -154,17 +173,17 @@
 	        
 	        // Validate this object now that it has been populated
 			arguments.entity.validate(context=arguments.context);
-	        
+			        
 	        // If the object passed validation then call save in the DAO, otherwise set the errors flag
 	        if(!arguments.entity.hasErrors()) {
 	            arguments.entity = getHibachiDAO().save(target=arguments.entity);
-	            
-	            // Announce After Events for Success
+        
+                // Announce After Events for Success
 				getHibachiEventService().announceEvent("after#arguments.entity.getClassName()#Save", arguments);
 				getHibachiEventService().announceEvent("after#arguments.entity.getClassName()#SaveSuccess", arguments);
-	        } else {
-	            
-	            // Announce After Events for Failure
+		    } else {
+            
+                // Announce After Events for Failure
 				getHibachiEventService().announceEvent("after#arguments.entity.getClassName()#Save", arguments);
 				getHibachiEventService().announceEvent("after#arguments.entity.getClassName()#SaveFailure", arguments);
 	        }
@@ -173,16 +192,19 @@
 	        return arguments.entity;
 	    }
 	    
-		/**
-		* exports the given query/array to file.
+	  /**
+		* Exports the given query/array to file.
 		* 
-		* @param data      Data to export. (Required) (Currently only supports query).
-		* @param columns      list of columns to export. (optional, default: all)
-		* @param columnNames      list of column headers to export. (optional, default: none)
-		* @param fileName      file name for export. (default: uuid)
-		* @param fileType      file type for export. (default: csv)
+		* @param data Data to export. (Required) (Currently only supports query and array of structs).
+		* @param columns List of columns to export. (optional, default: all)
+		* @param columnNames List of column headers to export. (optional, default: none)
+		* @param fileName File name for export. (default: uuid)
+		* @param fileType File type for export. (default: csv)
 		*/
 		public void function export(required any data, string columns, string columnNames, string fileName, string fileType = 'csv') {
+			if (isArray(data)){
+				arguments.data = transformArrayOfStructsToQuery( data, ListToArray(columnNames));
+			}
 			if(!structKeyExists(arguments,"fileName")){
 				arguments.fileName = createUUID() ;
 			}
@@ -215,7 +237,29 @@
 			// Open / Download File
 			getHibachiUtilityService().downloadFile(fileNameWithExt,filePath,"application/#arguments.fileType#",true);
 		}
-			
+	
+	private query function transformArrayOfStructsToQuery( required array arrayOfStructs, required array colNames ){
+		var rowsTotal = ArrayLen(arrayOfStructs);
+		var columnsTotal = ArrayLen(colNames); 
+		if (rowsTotal < 1){return QueryNew("");}
+		var columnNames = arguments.colNames;
+		var newQuery = queryNew(arrayToList(columnNames));
+		queryAddRow(newQuery, rowsTotal);
+		for (var i=1; i <= rowsTotal; i++){
+			for(var n=1; n <= columnsTotal; n++){
+				var column = nullReplace(columnNames[n], "");
+				var value = "";
+				//Fixes undefined values
+				if (!StructKeyExists(arrayOfStructs[i], "#column#")){
+					value = "";
+				}else{
+					value = arrayOfStructs[i][column];
+				}
+				querySetCell(newQuery, column, value, i);
+			}
+		}
+		return newQuery;
+	}	
 			    
 	 	/**
 		 * Generic ORM CRUD methods and dynamic methods by convention via onMissingMethod.
@@ -263,6 +307,8 @@
 			if ( lCaseMissingMethodName.startsWith( 'get' ) ) {
 				if(right(lCaseMissingMethodName,9) == "smartlist") {
 					return onMissingGetSmartListMethod( missingMethodName, missingMethodArguments );
+				} else if(right(lCaseMissingMethodName,14) == "collectionlist"){
+					return onMissingGetCollectionListMethod( missingMethodName, missingMethodArguments );
 				} else {
 					return onMissingGetMethod( missingMethodName, missingMethodArguments );
 				}
@@ -353,6 +399,29 @@
 			}
 			
 			return getSmartList(entityName=entityName, data=data);
+		} 
+		
+		/**
+		 * Provides dynamic getCollection method, by convention, on missing method:
+		 *
+		 *   getXXXCollection( struct data )
+		 *
+		 * ...in which XXX is an ORM entity name
+		 *
+		 * NOTE: Ordered arguments only--named arguments not supported.
+		 */
+		 
+		private function onMissingGetCollectionListMethod( required string missingMethodName, required struct missingMethodArguments ){
+			var collectionArgs = {};
+			var entityNameLength = len(arguments.missingMethodName) - 17;
+			
+			var entityName = missingMethodName.substring( 3,entityNameLength + 3 );
+			var data = {};
+			if( structCount(missingMethodArguments) && !isNull(missingMethodArguments[ 1 ]) && isStruct(missingMethodArguments[ 1 ]) ) {
+				data = missingMethodArguments[ 1 ];
+			}
+			
+			return getCollectionList(entityName=entityName, data=data);
 		} 
 		 
 	
@@ -628,7 +697,7 @@
 				return "";
 			}
 			
-			throw("The entity name that you have requested: #arguments.entityname# is not in the ORM Library of entity names that is setup in coldsrping.  Please add #arguments.entityname# to the list of entity mappings in coldspring.");
+			throw("The entity name that you have requested: '#arguments.entityname#' is not configured in ORM.");
 		}
 		
 		public string function getProperlyCasedFullEntityName( required string entityName ) {
@@ -646,13 +715,18 @@
 		public any function getEntitiesMetaData() {
 			if(!structCount(variables.entitiesMetaData)) {
 				var entityNamesArr = listToArray(structKeyList(ORMGetSessionFactory().getAllClassMetadata()));
+				var allMD = {};
 				for(var entityName in entityNamesArr) {
-					var entityMetaData = entityNew(entityName).getThisMetaData();
-					var entityShortName = listLast(entityMetaData.fullname, '.');
-					if(structKeyExists(entityMetaData, "persistent") && entityMetaData.persistent) {
-						 variables.entitiesMetaData[ entityShortName ] = entityMetaData;
+					var entity = entityNew(entityName);
+					if(structKeyExists(entity, "getThisMetaData")) {
+						var entityMetaData = entityNew(entityName).getThisMetaData();
+						if(isStruct(entityMetaData) && structKeyExists(entityMetaData, "fullname")) {
+							var entityShortName = listLast(entityMetaData.fullname, '.');
+							allMD[ entityShortName ] = entityMetaData;
+						}
 					}
 				}
+				variables.entitiesMetaData = allMD;
 			}
 			
 			return variables.entitiesMetaData;
@@ -664,9 +738,7 @@
 		
 		// @hint returns the entity meta data object that is used by a lot of the helper methods below
 		public any function getEntityORMMetaDataObject( required string entityName ) {
-			
 			arguments.entityName = getProperlyCasedFullEntityName( arguments.entityName );
-			
 			if(!structKeyExists(variables.entityORMMetaDataObjects, arguments.entityName)) {
 				variables.entityORMMetaDataObjects[ arguments.entityName ] = ormGetSessionFactory().getClassMetadata( arguments.entityName );
 			}
@@ -706,26 +778,63 @@
 		
 		// @hint returns a property of a given entity
 		public any function getPropertyByEntityNameAndPropertyName( required string entityName, required string propertyName ) {
-			return getPropertiesStructByEntityName( entityName=arguments.entityName )[ arguments.propertyName ]; 
+			if(!getHasAttributeByEntityNameAndPropertyIdentifier(arguments.entityName, arguments.propertyName)){
+				return getPropertiesStructByEntityName( entityName=arguments.entityName )[ arguments.propertyName ];
+			} else {
+				var key = 'attributeService_getAttributeNameByAttributeCode_#arguments.propertyName#';
+				if(getHibachiCacheService().hasCachedValue(key)) {
+					return getHibachiCacheService().getCachedValue(key);
+				}
+			}
 		}
 		
-		/*
-		public any function getEntitiesProcessContexts() {
-			if(!structKeyExists(variables, "entitiesProcessContexts")) {
-				var processContexts = {};
-				var emd = getEntitiesMetaData();
+		public any function getPropertyByEntityNameAndSingularName( required string entityName, required string singularName ) {
+			var propertiesStruct = getPropertiesStructByEntityName( entityName=arguments.entityName );
+			for(var key in propertiesStruct){
+				var property = propertiesStruct[key];
 				
-				for(var entityName in emd) {
-					if(structKeyExists(emd[ entityName ], "hb_processContexts")) {
-						processContexts[ entityName ] = listToArray(emd[ entityName ].hb_processContexts);
-					}
+				if(structKeyExists(property,'singularname') && structKeyExists(arguments,'singularname') && lcase(property.singularname) == lcase(arguments.singularName)){
+					return property;
 				}
-				
-				variables.entitiesProcessContexts = processContexts;
 			}
-			return variables.entitiesProcessContexts;
 		}
-		*/
+		
+		public boolean function hasPropertyByEntityNameAndSinuglarName( required string entityName, required string singularName){
+			return !isNull(getPropertyByEntityNameAndSingularName(arguments.entityName,arguments.singularName));
+		}
+		
+		public string function getProcessComponentPath(){
+	    	return getDao('hibachiDao').getApplicationValue('applicationKey')&'.model.process.';
+	    }
+	    
+	    public array function getProcessComponentDirectoryListing(){
+	    	if(!arrayLen(variables.processComponentDirectoryListing)){
+	    		var processComponentPath = getProcessComponentPath();
+		    	var processComponentDirectoryPath = expandPath('/'&getDao('hibachiDao').getApplicationKey()) & '/model/process';
+		    	variables.processComponentDirectoryListing = directoryList(processComponentDirectoryPath,false,'name','*.cfc');
+	    	}
+	    	
+	    	return variables.processComponentDirectoryListing;
+	    }
+
+		public struct function getEntitiesProcessContexts(){
+			if(!structCount(variables.entitiesProcessContexts)) {
+		    	var processComponentDirectoryListing = getProcessComponentDirectoryListing();
+		    	
+		    	for(var processComponent in processComponentDirectoryListing){
+		    		if(processComponent != 'HibachiProcess.cfc'){
+		    			var processObjectName = listFirst(processComponent,'.');
+		    			var entityName = listFirst(processObjectName,'_');
+		    			var processName = listLast(processObjectName,"_");
+		    			if(!structKeyExists(variables.entitiesProcessContexts,entityName)){
+		    				variables.entitiesProcessContexts[entityName] = [];
+		    			}
+		    			arrayAppend(variables.entitiesProcessContexts[entityName],processName);
+		    		}
+		    	}
+		    }
+	    	return variables.entitiesProcessContexts;
+	    }
 		
 		// =====================  END: Cached Entity Meta Data Methods ============================
 		
@@ -753,6 +862,14 @@
 			return structKeyExists(getPropertiesStructByEntityName(arguments.entityName), arguments.propertyName );
 		}
 		
+		public boolean function getPropertyIsObjectByEntityNameAndPropertyIdentifier(required string entityName, required string propertyIdentifier){
+			if(!getHasAttributeByEntityNameAndPropertyIdentifier(arguments.entityName, arguments.propertyIdentifier)){
+				return structKeyExists(getPropertiesStructByEntityName(getLastEntityNameInPropertyIdentifier(arguments.entityName, arguments.propertyIdentifier))[listLast(arguments.propertyIdentifier, ".")],'cfc');
+			} else {
+				return false;
+			}
+		}
+		
 		// @hint leverages the getEntityHasPropertyByEntityName() by traverses a propertyIdentifier first using getLastEntityNameInPropertyIdentifier()
 		public boolean function getHasPropertyByEntityNameAndPropertyIdentifier( required string entityName, required string propertyIdentifier ) {
 			try {
@@ -761,6 +878,7 @@
 				return false;	
 			}
 		}
+		
 		
 		// @hint traverses a propertyIdentifier to find the last entityName in the list... this is then used by the hasProperty and hasAttribute methods()
 		public string function getLastEntityNameInPropertyIdentifier( required string entityName, required string propertyIdentifier ) {
@@ -784,6 +902,32 @@
 			var entityMetaData = getEntityMetaData( arguments.entityName );
 			arguments.tableName = entityMetaData.table;
 			getHibachiDAO().updateRecordSortOrder(argumentcollection=arguments);
+		}
+		
+		// @hint leverages the getEntityHasAttributeByEntityName() by traverses a propertyIdentifier first using getLastEntityNameInPropertyIdentifier()
+		public boolean function getHasAttributeByEntityNameAndPropertyIdentifier( required string entityName, required string propertyIdentifier ) {
+			return getEntityHasAttributeByEntityName( entityName=getLastEntityNameInPropertyIdentifier(arguments.entityName, arguments.propertyIdentifier), attributeCode=listLast(arguments.propertyIdentifier, "._") );
+		}
+		
+		// @hint returns true or false based on an entityName, and checks if that entity has an extended attribute with that attributeCode
+		public boolean function getEntityHasAttributeByEntityName( required string entityName, required string attributeCode ) {
+			var attributeCodesList = getHibachiCacheService().getOrCacheFunctionValue("attributeService_getAttributeCodesListByAttributeSetType_ast#getProperlyCasedShortEntityName(arguments.entityName)#", "attributeService", "getAttributeCodesListByAttributeSetType", {1="ast#getProperlyCasedShortEntityName(arguments.entityName)#"});
+			if(listFindNoCase(attributeCodesList, arguments.attributeCode)) {
+				return true;
+			}
+			
+			return false; 
+		}		
+		
+		//used by the rest api to return default property values
+		public any function getDefaultPropertiesByEntityName(required string entityName){
+			// First Check the application cache
+			if( hasApplicationValue("classDefaultPropertyCache_#getProperlyCasedFullClassNameByEntityName( arguments.entityName )#") ) {
+				return getApplicationValue("classDefaultPropertyCache_#getProperlyCasedFullClassNameByEntityName( arguments.entityName )#");
+			}
+			
+			// Pull the meta data from the object (which in turn will cache it in the application for the next time)
+			return getEntityObject( arguments.entityName ).getDefaultCollectionProperties();
 		}
 		
 	</cfscript>
